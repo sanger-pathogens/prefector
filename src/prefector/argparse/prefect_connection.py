@@ -1,14 +1,17 @@
-import os
-import json
 import argparse
-import requests
-
+import json
+import os
 from pathlib import Path
-from typing import Optional, Any
-from prefect.settings.legacy import Setting
+from typing import Any, Optional
+
+import requests
 from prefect.settings import (
-    PREFECT_API_URL, PREFECT_API_AUTH_STRING, PREFECT_CLIENT_CUSTOM_HEADERS, PREFECT_API_SSL_CERT_FILE
+    PREFECT_API_AUTH_STRING,
+    PREFECT_API_SSL_CERT_FILE,
+    PREFECT_API_URL,
+    PREFECT_CLIENT_CUSTOM_HEADERS,
 )
+from prefect.settings.legacy import Setting
 
 
 def attach_prefect_connection_options(parser: argparse.ArgumentParser):
@@ -20,11 +23,7 @@ def attach_prefect_connection_options(parser: argparse.ArgumentParser):
         help="Prefect API URL (or PREFECT_API_URL).",
     )
 
-    parser.add_argument(
-        "--ssl-cert",
-        type=Path,
-        help="Path to SSL ca.crt file"
-    )
+    parser.add_argument("--ssl-cert", type=Path, help="Path to SSL ca.crt file")
 
     basic_auth_group = parser.add_argument_group("Basic Prefect Auth")
     basic_auth_group.add_argument(

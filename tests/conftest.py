@@ -1,10 +1,9 @@
-import sys
-import pytest
 import importlib
-
-from typing import Any
+import sys
 from pathlib import Path
+from typing import Any
 
+import pytest
 from prefect.filesystems import LocalFileSystem
 from prefect.testing.utilities import prefect_test_harness
 
@@ -26,10 +25,7 @@ def deployment_flow(deployment_flow_dir) -> str:
 
     module_path = deployment_flow_dir / f"{module_name}.py"
     module_path.write_text(
-        "from prefect import flow\n"
-        "@flow\n"
-        f"def {function_name}(retries: int = 0):\n"
-        "    return None\n",
+        f"from prefect import flow\n@flow\ndef {function_name}(retries: int = 0):\n    return None\n",
         encoding="utf-8",
     )
 

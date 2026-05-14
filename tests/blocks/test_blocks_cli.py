@@ -1,7 +1,6 @@
 import pytest
-
-from pydantic_settings import BaseSettings
 from prefect.blocks.core import Block
+from pydantic_settings import BaseSettings
 
 from prefector.blocks import cli
 from prefector.blocks.base import BlockSpec

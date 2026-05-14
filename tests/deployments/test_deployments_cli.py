@@ -1,5 +1,4 @@
 import pytest
-
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 
@@ -75,13 +74,8 @@ def test_deploy_target(monkeypatch, prefect_test_fixture, deployment_spec_dict, 
                 name=pool_name,
                 base_job_template={
                     "job_configuration": {"image": "{{ image }}"},
-                    "variables": {
-                        "type": "object",
-                        "properties": {
-                            "image": {"title": "Image", "type": "string"}
-                        }
-                    }
-                }
+                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
+                },
             ),
             overwrite=True,
         )
@@ -144,14 +138,20 @@ def test_main_deploy_shows_user_friendly_validation_error(monkeypatch, deploymen
 
     with pytest.raises(SystemExit) as exc:
         deploy.main(
-                [
-                    "deploy",
-                    "--deployments-dir", "unused",
-                    "--images-manifest", "unused",
-                    "--api-url", "http://prefect.localhost:24200/api",
-                    "--work-pool", "pool",
-                    "--work-queue", "queue",
-                    "--image-prefix", "img",
+            [
+                "deploy",
+                "--deployments-dir",
+                "unused",
+                "--images-manifest",
+                "unused",
+                "--api-url",
+                "http://prefect.localhost:24200/api",
+                "--work-pool",
+                "pool",
+                "--work-queue",
+                "queue",
+                "--image-prefix",
+                "img",
             ]
         )
 

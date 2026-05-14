@@ -1,13 +1,19 @@
-import yaml
-import itertools
 import importlib
-
-from pathlib import Path
+import itertools
 from collections import Counter
-from typing import Any, Annotated
+from pathlib import Path
+from typing import Annotated, Any
+
+import yaml
 from pydantic import (
-    BaseModel, RootModel, Field, ConfigDict,
-    StringConstraints, field_validator, model_validator, ValidationError
+    BaseModel,
+    ConfigDict,
+    Field,
+    RootModel,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
 )
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
@@ -47,11 +53,7 @@ class DeploymentSpec(BaseModel):
     parameters: dict[str, Any] = Field(default_factory=dict)
 
     def __str__(self) -> str:
-        return (
-            f"{self.name}\n"
-            f"  flow: {self.flow}\n"
-            f"  image_key: {self.image_key}"
-        )
+        return f"{self.name}\n  flow: {self.flow}\n  image_key: {self.image_key}"
 
     @field_validator("flow")
     @classmethod
@@ -97,7 +99,7 @@ class DeploymentSpec(BaseModel):
 def load_deployments(config_dir: Path) -> list[DeploymentSpec]:
     specs = []
 
-    config_paths = itertools.chain(config_dir.glob('*.yaml'), config_dir.glob('*.yml'))
+    config_paths = itertools.chain(config_dir.glob("*.yaml"), config_dir.glob("*.yml"))
     for path in config_paths:
         spec = DeploymentSpec.from_yaml(path)
         specs.append(spec)

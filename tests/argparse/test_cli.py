@@ -61,4 +61,3 @@ def test_blocks_help_is_passthrough(monkeypatch):
 
     assert result == 0
     assert calls == [["--help"]]
-

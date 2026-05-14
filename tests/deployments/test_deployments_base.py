@@ -1,8 +1,9 @@
-import yaml
-import pytest
 from pathlib import Path
 
-from prefector.deployments.base import ImageManifest, DeploymentSpec, load_deployments, load_image_manifest
+import pytest
+import yaml
+
+from prefector.deployments.base import DeploymentSpec, ImageManifest, load_deployments, load_image_manifest
 
 
 def test_deployment_spec_flow_helpers(deployment_spec_dict):
@@ -72,12 +73,12 @@ def test_load_deployments_loads_yaml_files(tmp_path: Path, deployment_spec_dict)
     file2 = tmp_path / "b.yml"
     file2.write_text(
         "\n".join(
-                [
-                    "name: deploy-b",
-                    f"flow: {deployment_spec_dict['flow']}",
-                    f"image_key: {deployment_spec_dict['image_key']}",
-                ],
-            ),
+            [
+                "name: deploy-b",
+                f"flow: {deployment_spec_dict['flow']}",
+                f"image_key: {deployment_spec_dict['image_key']}",
+            ],
+        ),
         encoding="utf-8",
     )
 
@@ -117,17 +118,21 @@ def test_load_deployments_rejects_duplicate_names(tmp_path: Path, deployment_spe
 
 
 def test_image_manifest_get_returns_entry():
-    manifest = ImageManifest.model_validate([
-        {"key": "dbt", "name": "icddrb-dbt"},
-    ])
+    manifest = ImageManifest.model_validate(
+        [
+            {"key": "dbt", "name": "icddrb-dbt"},
+        ]
+    )
 
     assert manifest.get("dbt").name == "icddrb-dbt"
 
 
 def test_image_manifest_get_raises_for_unknown_key():
-    manifest = ImageManifest.model_validate([
-        {"key": "dbt", "name": "icddrb-dbt"},
-    ])
+    manifest = ImageManifest.model_validate(
+        [
+            {"key": "dbt", "name": "icddrb-dbt"},
+        ]
+    )
 
     with pytest.raises(ValueError, match="Unknown image key 'missing'"):
         manifest.get("missing")
@@ -136,10 +141,7 @@ def test_image_manifest_get_raises_for_unknown_key():
 def test_load_image_manifest(tmp_path):
     path = tmp_path / "images.yaml"
     path.write_text(
-        "- key: redcap\n"
-        "  name: icddrb-redcap\n"
-        "- key: dbt\n"
-        "  name: icddrb-dbt\n",
+        "- key: redcap\n  name: icddrb-redcap\n- key: dbt\n  name: icddrb-dbt\n",
         encoding="utf-8",
     )
 
@@ -161,10 +163,7 @@ def test_load_image_manifest_raises_for_invalid_shape(tmp_path):
 def test_load_image_manifest_raises_for_duplicate_keys(tmp_path):
     path = tmp_path / "images.yaml"
     path.write_text(
-        "- key: dbt\n"
-        "  name: icddrb-dbt\n"
-        "- key: dbt\n"
-        "  name: icddrb-dbt-alt\n",
+        "- key: dbt\n  name: icddrb-dbt\n- key: dbt\n  name: icddrb-dbt-alt\n",
         encoding="utf-8",
     )
 
