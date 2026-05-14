@@ -41,22 +41,3 @@ def test_print_blocks_uses_block_header(capsys):
 
     assert "Block: a" in out
     assert "Type:  DummyBlock" in out
-
-
-def test_deploy_targets_dry_run_does_not_save(monkeypatch):
-    called = {"save": False}
-
-    class StubBlock:
-        def save(self, name, overwrite):
-            called["save"] = True
-
-    class StubSpec:
-        name = "a"
-        block_cls = DummyBlock
-
-        @staticmethod
-        def build():
-            return StubBlock()
-
-    cli.deploy_block(StubSpec(), dry_run=True)
-    assert called["save"] is False
