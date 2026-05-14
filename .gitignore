@@ -3,5 +3,6 @@
 
 # envs
 venv/
+.venv/
 
 .coverage
