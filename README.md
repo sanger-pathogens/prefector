@@ -1,5 +1,7 @@
 # prefector
 
+[![Tests](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml/badge.svg)](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml)
+
 Reusable CLI helpers for deploying Prefect blocks and deployments from downstream
 project specs.
 
@@ -42,7 +44,7 @@ Setup local environment
 python3 -m venv venv
 source venv/bin/activate
 python -m pip install --upgrade pip
-pip install -e ".[dev]"
+pip install -e "." pytest pytest-cov ruff
 ```
 
 Run tests with:
