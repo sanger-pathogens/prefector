@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "prefector"
+version = "0.1.0"
+description = "Reusable Prefect block and deployment CLI."
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "prefect>=3,<4",
+  "pydantic>=2",
+  "pydantic-settings",
+  "PyYAML~=6.0.3",
+  "requests~=2.33.1",
+  "rich",
+]
+
+[project.scripts]
+prefector = "prefector.argparse.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest~=9.0.2",
+  "pytest-cov~=7.1.0",
+  "ruff~=0.15.8",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prefector"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["F", "E", "B", "PLR", "C"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["PLR2004", "PLR0913", "PLR0917", "PLR6301"]
