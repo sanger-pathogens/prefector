@@ -128,13 +128,9 @@ def _print_blocks(specs: Iterable[BlockSpec]) -> None:
         _print_block_header(spec)
 
 
-def deploy_block(spec: BlockSpec, *, dry_run: bool) -> None:
+def deploy_block(spec: BlockSpec) -> None:
     _print_block_header(spec)
     CONSOLE.print("[1/2] Preparing block")
-
-    if dry_run:
-        CONSOLE.print("[green][✓][/green] Done (dry run)")
-        return
 
     try:
         block = spec.build()
@@ -175,11 +171,6 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         help="Block name to deploy. Repeat --target to pass multiple values.",
     )
-    deploy_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the deployment plan without calling Prefect API.",
-    )
     return parser
 
 
@@ -201,7 +192,7 @@ def main(args: list[str] | None = None) -> int:
 
         with temporary_settings(updates=prefect_settings):
             for index, target in enumerate(targets):
-                deploy_block(target, dry_run=parsed.dry_run)
+                deploy_block(target)
                 if index < len(targets) - 1:
                     CONSOLE.print()
 

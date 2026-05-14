@@ -3,6 +3,7 @@ from typing import Any, Annotated
 
 from pydantic import Field, create_model, BaseModel, ValidationError, StringConstraints
 from prefect.blocks.core import Block
+from prefect.exceptions import PrefectException
 from pydantic_settings import BaseSettings
 from pydantic_settings import SettingsConfigDict
 
@@ -117,4 +118,21 @@ class BlockSpec:
         except ValidationError as exc:
             raise BlockBuildError(self.name, self.settings_cls, exc) from exc
 
-        return self.block_cls(**settings.model_dump())
+        payload = self._resolve_settings(settings)
+        return self.block_cls(**payload)
+
+    def _resolve_settings(self, settings: BaseSettings) -> dict[str, Any]:
+        payload = settings.model_dump()
+
+        for field_name in settings.model_fields.keys():
+            value = getattr(settings, field_name)
+            if isinstance(value, BlockSpec):
+                try:
+                    payload[field_name] = value.block_cls.load(value.name)
+                except PrefectException as exc:
+                    raise ValueError(
+                        f"Failed to load dependency block '{value.name}' "
+                        f"for '{self.name}' ({value.block_cls.__name__})."
+                    ) from exc
+
+        return payload

@@ -33,10 +33,10 @@ def test_deploy_blocks_passes_through_extra_args(monkeypatch):
     monkeypatch.setattr(cli, "blocks_main", lambda args: calls.append(args) or 0)
     monkeypatch.setattr(cli, "deployments_main", lambda _args: pytest.fail("unexpected"))
 
-    result = cli.main(["blocks", "deploy", "--target", "bronze", "--dry-run"])
+    result = cli.main(["blocks", "deploy", "--target", "bronze"])
 
     assert result == 0
-    assert calls == [["deploy", "--target", "bronze", "--dry-run"]]
+    assert calls == [["deploy", "--target", "bronze"]]
 
 
 def test_deploy_deployments_passes_through_extra_args(monkeypatch):
@@ -61,4 +61,3 @@ def test_blocks_help_is_passthrough(monkeypatch):
 
     assert result == 0
     assert calls == [["--help"]]
-
