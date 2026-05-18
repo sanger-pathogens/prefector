@@ -43,7 +43,7 @@ Setup local environment
 Install project dependencies:
 
 ```bash
-poetry init
+poetry env use 3.12
 source .venv/bin/activate
 poetry install --with dev
 ```
