@@ -1,11 +1,10 @@
 from dataclasses import dataclass
-from typing import Any, Annotated
+from typing import Annotated, Any
 
-from pydantic import Field, create_model, BaseModel, ValidationError, StringConstraints
 from prefect.blocks.core import Block
 from prefect.exceptions import PrefectException
-from pydantic_settings import BaseSettings
-from pydantic_settings import SettingsConfigDict
+from pydantic import BaseModel, Field, StringConstraints, ValidationError, create_model
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 

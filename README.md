@@ -1,4 +1,4 @@
-# prefector
+# Prefector
 
 [![Tests](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml/badge.svg)](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml)
 
@@ -40,14 +40,28 @@ Deployment specs are YAML files loaded as `prefector.deployments.base.Deployment
 
 Setup local environment
 
+Install project dependencies:
+
 ```bash
-python3 -m venv venv
-source venv/bin/activate
-python -m pip install --upgrade pip
-pip install -e "." pytest pytest-cov ruff
+poetry init
+source .venv/bin/activate
+poetry install --with dev
+```
+
+Set up pre-commit hooks and linting:
+
+```bash
+pre-commit install
+```
+
+This will run pre-commit hooks on every commit. To run pre-commit manually, use
+
+```bash
+pre commit run -a
 ```
 
 Run tests with:
+
 ```bash
 pytest
 ```
@@ -56,16 +70,4 @@ With coverage:
 
 ```bash
 pytest --cov=src/prefector
-```
-
-
-Run linter with:
-```bash
-ruff check .
-```
-
-Apply auto-fixes where available:
-
-```bash
-ruff check . --fix
 ```

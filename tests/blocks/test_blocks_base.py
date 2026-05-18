@@ -1,7 +1,6 @@
 import pytest
-
-from pydantic import BaseModel
 from prefect.blocks.core import Block
+from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from prefector.blocks.base import BlockBuildError, BlockSpec, settings_model_for_block

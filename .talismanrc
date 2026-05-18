@@ -1,0 +1,5 @@
+threshold: medium
+fileignoreconfig:
+- filename: poetry.lock
+  allowed_patterns:
+    - ".*"

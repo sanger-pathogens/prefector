@@ -1,15 +1,15 @@
+import argparse
+import contextlib
+import importlib
 import io
 import logging
-import argparse
-import importlib
-import contextlib
-
 from pathlib import Path
-from rich.console import Console
-from typing import Iterable, Any
-from prefect.settings import temporary_settings
+from typing import Any, Iterable
+
 from prefect.exceptions import ParameterTypeError
+from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
+from rich.console import Console
 
 from prefector.argparse.prefect_connection import (
     attach_prefect_connection_options,

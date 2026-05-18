@@ -1,20 +1,20 @@
-import sys
 import argparse
 import hashlib
 import importlib.util
-
+import sys
+from collections import Counter
 from pathlib import Path
 from types import ModuleType
 from typing import Iterable
-from collections import Counter
-from rich.console import Console
-from prefect.settings import temporary_settings
 
-from prefector.blocks.base import BlockSpec, BlockBuildError
+from prefect.settings import temporary_settings
+from rich.console import Console
+
 from prefector.argparse.prefect_connection import (
     attach_prefect_connection_options,
     generate_prefect_settings,
 )
+from prefector.blocks.base import BlockBuildError, BlockSpec
 
 CONSOLE = Console()
 

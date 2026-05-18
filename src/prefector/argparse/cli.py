@@ -1,5 +1,5 @@
-import sys
 import argparse
+import sys
 
 from prefector.blocks.cli import main as blocks_main
 from prefector.deployments.cli import main as deployments_main
@@ -34,4 +34,3 @@ def main(args: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
