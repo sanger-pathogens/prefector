@@ -15,6 +15,7 @@ dependencies = [
   "PyYAML~=6.0.3",
   "requests~=2.33.1",
   "rich",
+  "click-option-group (>=0.5.9,<0.6.0)",
 ]
 
 [project.scripts]
