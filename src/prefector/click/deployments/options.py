@@ -10,7 +10,17 @@ class DeploymentOptions:
     deployments_dir: Path
 
 
+@dataclass
+class DeploymentDeployOptions:
+    work_pool: str
+    work_queue: str
+    image_prefix: str
+    image_tag: str
+    dry_run: bool
+
+
 _OPTION_KEYS = {f.name for f in DeploymentOptions.__dataclass_fields__.values()}
+_DEPLOY_OPTION_KEYS = {f.name for f in DeploymentDeployOptions.__dataclass_fields__.values()}
 
 
 def deployment_options(f):
@@ -20,5 +30,22 @@ def deployment_options(f):
     def wrapper(*args, **kwargs):
         deployment_opts = DeploymentOptions(**{k: kwargs.pop(k) for k in _OPTION_KEYS})
         return f(*args, deployment_opts=deployment_opts, **kwargs)
+
+    return wrapper
+
+
+def deployment_deploy_options(f):
+    @optgroup("Deploy")
+    @optgroup.option("--work-pool", help="Prefect work pool.", default="default", show_default=True)
+    @optgroup.option("--work-queue", help="Prefect work queue", default="default", show_default=True)
+    @optgroup.option("--image-prefix", help="Image prefix/registry, e.g. ghcr.io/org.", required=True)
+    @optgroup.option("--image-tag", help="Image tag for deployment.", default="latest", show_default=True)
+    @optgroup.option(
+        "--dry-run", help="Print only the proposed actions without executing.", is_flag=True, default=False
+    )
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        deployment_deploy_opts = DeploymentDeployOptions(**{k: kwargs.pop(k) for k in _DEPLOY_OPTION_KEYS})
+        return f(*args, deployment_deploy_opts=deployment_deploy_opts, **kwargs)
 
     return wrapper
