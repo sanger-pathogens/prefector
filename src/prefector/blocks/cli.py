@@ -1,4 +1,3 @@
-import argparse
 import hashlib
 import importlib.util
 import sys
@@ -7,14 +6,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import Iterable
 
+import click
 from prefect.settings import temporary_settings
 from rich.console import Console
 
-from prefector.argparse.prefect_connection import (
-    attach_prefect_connection_options,
-    generate_prefect_settings,
-)
 from prefector.blocks.base import BlockBuildError, BlockSpec
+from prefector.blocks.options import BlockOptions, block_options
+from prefector.prefect_connection.connection import generate_prefect_settings
+from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
 CONSOLE = Console()
 
@@ -110,7 +109,7 @@ def load_blocks(spec_dir: Path) -> list[BlockSpec]:
     return specs
 
 
-def _select_targets(selected: Iterable[str], specs: list[BlockSpec]) -> list[BlockSpec]:
+def select_targets(selected: Iterable[str], specs: list[BlockSpec]) -> list[BlockSpec]:
     if not selected:
         return specs
 
@@ -123,7 +122,7 @@ def _select_targets(selected: Iterable[str], specs: list[BlockSpec]) -> list[Blo
     return list(index.values())
 
 
-def _print_blocks(specs: Iterable[BlockSpec]) -> None:
+def print_blocks(specs: Iterable[BlockSpec]) -> None:
     for spec in specs:
         _print_block_header(spec)
 
@@ -142,60 +141,32 @@ def deploy_block(spec: BlockSpec) -> None:
     CONSOLE.print("[green][✓][/green] Done")
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="List and deploy Prefect blocks from Python specs.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    list_parser = subparsers.add_parser("list", help="Print configured block specs.")
-    list_parser.add_argument(
-        "--blocks-dir",
-        required=True,
-        type=Path,
-        help="Directory with block Python specs.",
-    )
-
-    deploy_parser = subparsers.add_parser("deploy", help="Create/update blocks on Prefect server.")
-    deploy_parser.add_argument(
-        "--blocks-dir",
-        required=True,
-        type=Path,
-        help="Directory with block Python specs.",
-    )
-    attach_prefect_connection_options(deploy_parser)
-    deploy_parser.add_argument(
-        "--target",
-        action="append",
-        default=[],
-        help="Block name to deploy. Repeat --target to pass multiple values.",
-    )
-    return parser
+@click.group(name="blocks")
+def blocks_command():
+    """List or deploy Prefect blocks"""
+    pass
 
 
-def main(args: list[str] | None = None) -> int:
-    parser = _build_parser()
-    parsed = parser.parse_args(args)
-    blocks = load_blocks(parsed.blocks_dir)
+@blocks_command.command()
+@prefect_connection_options
+@block_options
+def deploy(connection: PrefectConnectionArgs, block_opts: BlockOptions):
+    """Deploy Prefect blocks"""
+    blocks_to_deploy = load_blocks(block_opts.blocks_dir)
+    prefect_settings = generate_prefect_settings(connection)
 
-    if parsed.command == "list":
-        _print_blocks(blocks)
-        return 0
+    targets = select_targets("", blocks_to_deploy)
 
-    if parsed.command == "deploy":
-        try:
-            prefect_settings = generate_prefect_settings(parsed)
-            targets = _select_targets(parsed.target, blocks)
-        except ValueError as exc:
-            parser.error(str(exc))
+    with temporary_settings(updates=prefect_settings):
+        for index, target in enumerate(targets):
+            deploy_block(target)
+            if index < len(targets) - 1:
+                CONSOLE.print()
 
-        with temporary_settings(updates=prefect_settings):
-            for index, target in enumerate(targets):
-                deploy_block(target)
-                if index < len(targets) - 1:
-                    CONSOLE.print()
 
-        return 0
-
-    parser.error(f"Unsupported command: {parsed.command}")
+@blocks_command.command(name="list")
+@block_options
+def list_blocks(block_opts: BlockOptions):
+    """List Prefect blocks"""
+    blocks = load_blocks(block_opts.blocks_dir)
+    print_blocks(blocks)

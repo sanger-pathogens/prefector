@@ -75,3 +75,14 @@ def local_storage_block(prefect_test_fixture, local_storage):
     name = "local-storage-block"
     local_storage.save(name, overwrite=True)
     return name
+
+
+@pytest.fixture
+def base_args():
+    base_args = {
+        "--api-url": "http://localhost:4200/api",
+    }
+    args = []
+    for key in base_args.keys():
+        args += [key, base_args[key]]
+    return args

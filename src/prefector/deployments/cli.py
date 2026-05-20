@@ -1,21 +1,24 @@
-import argparse
 import contextlib
 import importlib
 import io
 import logging
-from pathlib import Path
 from typing import Any, Iterable
 
+import click
 from prefect.exceptions import ParameterTypeError
 from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
 from rich.console import Console
 
-from prefector.argparse.prefect_connection import (
-    attach_prefect_connection_options,
-    generate_prefect_settings,
-)
 from prefector.deployments.base import DeploymentSpec, load_deployments, load_image_manifest
+from prefector.deployments.options import (
+    DeploymentDeployOptions,
+    DeploymentOptions,
+    deployment_deploy_options,
+    deployment_options,
+)
+from prefector.prefect_connection.connection import generate_prefect_settings
+from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
 CONSOLE = Console()
 
@@ -116,110 +119,52 @@ def deploy_target(  # noqa: PLR0913
     CONSOLE.print(f"[green][✓][/green] Done (ID: {deployment_id})")
 
 
-def _print_deployments(deployments: Iterable[DeploymentSpec]) -> None:
+def print_deployments(deployments: Iterable[DeploymentSpec]) -> None:
     for deployment in deployments:
         _print_deployment_header(deployment)
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        description="List and deploy Prefect deployments from YAML specs.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    list_parser = subparsers.add_parser("list", help="Print configured deployment specs.")
-    list_parser.add_argument(
-        "--deployments-dir",
-        type=Path,
-        required=True,
-        help="Directory with deployment YAML files.",
-    )
-
-    deploy_parser = subparsers.add_parser("deploy", help="Create/update deployments on Prefect server.")
-    deploy_parser.add_argument(
-        "--deployments-dir",
-        type=Path,
-        required=True,
-        help="Directory with deployment YAML files.",
-    )
-    deploy_parser.add_argument(
-        "--images-manifest",
-        type=Path,
-        required=True,
-        help="Path to image manifest YAML (key -> name mapping).",
-    )
-    attach_prefect_connection_options(deploy_parser)
-    deploy_parser.add_argument(
-        "--target",
-        action="append",
-        default=[],
-        help="Deployment name to deploy. Repeat --target to pass multiple values.",
-    )
-    deploy_parser.add_argument(
-        "--work-pool",
-        required=True,
-        help="Work pool name for all deployments.",
-    )
-    deploy_parser.add_argument(
-        "--work-queue",
-        help="Work queue name for all deployments.",
-    )
-    deploy_parser.add_argument(
-        "--image-prefix",
-        required=True,
-        help="Image prefix/registry, e.g. ghcr.io/org.",
-    )
-    deploy_parser.add_argument(
-        "--image-tag",
-        default="latest",
-        help="Image tag for all deployments.",
-    )
-    deploy_parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Print the deployment plan without calling Prefect API.",
-    )
-
-    return parser
+@click.group(name="deployments")
+def deployments_command():
+    """List or deploy Prefect deployments"""
+    pass
 
 
-def main(args: list[str] | None = None) -> int:
-    parser = _build_parser()
-    parsed = parser.parse_args(args)
-    deployments = load_deployments(parsed.deployments_dir)
+@deployments_command.command()
+@prefect_connection_options
+@deployment_options
+@deployment_deploy_options
+def deploy(
+    connection: PrefectConnectionArgs,
+    deployment_opts: DeploymentOptions,
+    deployment_deploy_opts: DeploymentDeployOptions,
+):
+    """Deploy Prefect deployments"""
+    deployments = load_deployments(deployment_opts.deployments_dir)
+    images = load_image_manifest(deployment_opts.images_manifest)
+    prefect_settings = generate_prefect_settings(connection)
+    targets = _select_targets(deployment_opts.target, deployments)
 
-    if parsed.command == "list":
-        _print_deployments(deployments)
-        return 0
+    with temporary_settings(updates=prefect_settings):
+        for index, target in enumerate(targets):
+            deploy_target(
+                spec=target,
+                work_pool_name=deployment_deploy_opts.work_pool,
+                work_queue_name=deployment_deploy_opts.work_queue,
+                image=_build_image_name(
+                    image_prefix=deployment_deploy_opts.image_prefix,
+                    image_name=images.get(target.image_key).name,
+                    image_tag=deployment_deploy_opts.image_tag,
+                ),
+                dry_run=deployment_deploy_opts.dry_run,
+            )
+            if index < len(targets) - 1:
+                CONSOLE.print()
 
-    if parsed.command == "deploy":
-        try:
-            images = load_image_manifest(parsed.images_manifest)
-            prefect_settings = generate_prefect_settings(parsed)
-            targets = _select_targets(parsed.target, deployments)
-        except ValueError as exc:
-            parser.exit(2, f"error: {exc}\n")
 
-        with temporary_settings(updates=prefect_settings):
-            for index, target in enumerate(targets):
-                try:
-                    deploy_target(
-                        spec=target,
-                        work_pool_name=parsed.work_pool,
-                        work_queue_name=parsed.work_queue,
-                        image=_build_image_name(
-                            image_prefix=parsed.image_prefix,
-                            image_name=images.get(target.image_key).name,
-                            image_tag=parsed.image_tag,
-                        ),
-                        dry_run=parsed.dry_run,
-                    )
-                except ValueError as exc:
-                    parser.exit(2, f"error: {exc}\n")
-                if index < len(targets) - 1:
-                    CONSOLE.print()
-
-        return 0
-
-    parser.error(f"Unsupported command: {parsed.command}")
+@deployments_command.command(name="list")
+@deployment_options
+def list_deployments(deployment_opts: DeploymentOptions):
+    """List Prefect deployments"""
+    deployments = load_deployments(deployment_opts.deployments_dir)
+    print_deployments(deployments)

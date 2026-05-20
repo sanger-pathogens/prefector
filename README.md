@@ -20,12 +20,9 @@ pip install prefector
 prefector blocks list --blocks-dir path/to/block/specs
 prefector blocks deploy --blocks-dir path/to/block/specs --api-url "$PREFECT_API_URL"
 
-prefector deployments \
-  list \
-  --deployments-dir path/to/deployment/specs
+prefector deployments list --deployments-dir path/to/deployment/specs
 
-prefector deployments \
-  deploy \
+prefector deployments deploy \
   --deployments-dir path/to/deployment/specs \
   --images-manifest path/to/images.yaml \
   --api-url "$PREFECT_API_URL" \
@@ -33,8 +30,8 @@ prefector deployments \
   --image-prefix ghcr.io/example
 ```
 
-Block spec modules must expose `BLOCKS: list[prefector.blocks.base.BlockSpec]`.
-Deployment specs are YAML files loaded as `prefector.deployments.base.DeploymentSpec`.
+Block spec modules must expose `BLOCKS: list[prefector.BlockSpec]`.
+Deployment specs are YAML files loaded as `prefector.DeploymentSpec`.
 
 ## Development
 

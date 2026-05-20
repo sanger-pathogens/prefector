@@ -15,10 +15,12 @@ dependencies = [
   "PyYAML~=6.0.3",
   "requests~=2.33.1",
   "rich",
+  "click-option-group (>=0.5.9,<0.6.0)",
+  "prefect-aws (>=0.7.9,<0.8.0)",
 ]
 
 [project.scripts]
-prefector = "prefector.argparse.cli:main"
+prefector = "prefector.cli:cli"
 
 [dependency-groups]
 dev = [
