@@ -2,6 +2,7 @@ import functools
 from dataclasses import dataclass
 from pathlib import Path
 
+import click
 from click_option_group import optgroup
 
 
@@ -15,7 +16,12 @@ _OPTION_KEYS = {f.name for f in BlockOptions.__dataclass_fields__.values()}
 
 def block_options(f):
     @optgroup.group("Blocks")
-    @optgroup.option("--blocks-dir", type=Path, default=Path.cwd(), help="Directory containing blocks.")
+    @optgroup.option(
+        "--blocks-dir",
+        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        default=".",
+        help="Directory containing blocks.",
+    )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         block_opts = BlockOptions(**{k: kwargs.pop(k) for k in _OPTION_KEYS})

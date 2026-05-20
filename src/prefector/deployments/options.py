@@ -2,6 +2,7 @@ import functools
 from dataclasses import dataclass
 from pathlib import Path
 
+import click
 from click_option_group import optgroup
 
 
@@ -25,7 +26,12 @@ _DEPLOY_OPTION_KEYS = {f.name for f in DeploymentDeployOptions.__dataclass_field
 
 def deployment_options(f):
     @optgroup.group("Deployments")
-    @optgroup.option("--deployments-dir", type=Path, default=Path.cwd(), help="Directory containing deployment YAML.")
+    @optgroup.option(
+        "--deployments-dir",
+        type=click.Path(exists=True, file_okay=False, path_type=Path),
+        default=".",
+        help="Directory containing deployment YAML.",
+    )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         deployment_opts = DeploymentOptions(**{k: kwargs.pop(k) for k in _OPTION_KEYS})

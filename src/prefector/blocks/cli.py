@@ -165,9 +165,8 @@ def deploy(connection: PrefectConnectionArgs, block_opts: BlockOptions):
 
 
 @blocks_command.command(name="list")
-@prefect_connection_options
 @block_options
-def list_blocks(connection: PrefectConnectionArgs, block_opts: BlockOptions):
+def list_blocks(block_opts: BlockOptions):
     """List Prefect blocks"""
     blocks = load_blocks(block_opts.blocks_dir)
     print_blocks(blocks)

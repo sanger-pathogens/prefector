@@ -163,9 +163,8 @@ def deploy(
 
 
 @deployments_command.command(name="list")
-@prefect_connection_options
 @deployment_options
-def list_deployments(connection: PrefectConnectionArgs, deployment_opts: DeploymentOptions):
+def list_deployments(deployment_opts: DeploymentOptions):
     """List Prefect deployments"""
     deployments = load_deployments(deployment_opts.deployments_dir)
     print_deployments(deployments)
