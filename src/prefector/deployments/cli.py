@@ -10,15 +10,15 @@ from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
 from rich.console import Console
 
-from prefector.click.deployments.options import (
+from prefector.deployments.base import DeploymentSpec, load_deployments, load_image_manifest
+from prefector.deployments.options import (
     DeploymentDeployOptions,
     DeploymentOptions,
     deployment_deploy_options,
     deployment_options,
 )
-from prefector.click.prefect_connection.connection import generate_prefect_settings
-from prefector.click.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
-from prefector.deployments.base import DeploymentSpec, load_deployments, load_image_manifest
+from prefector.prefect_connection.connection import generate_prefect_settings
+from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
 CONSOLE = Console()
 

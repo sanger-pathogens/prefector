@@ -10,10 +10,10 @@ import click
 from prefect.settings import temporary_settings
 from rich.console import Console
 
-from prefector.click.blocks.base import BlockBuildError, BlockSpec
-from prefector.click.blocks.options import BlockOptions, block_options
-from prefector.click.prefect_connection.connection import generate_prefect_settings
-from prefector.click.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
+from prefector.blocks.base import BlockBuildError, BlockSpec
+from prefector.blocks.options import BlockOptions, block_options
+from prefector.prefect_connection.connection import generate_prefect_settings
+from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
 CONSOLE = Console()
 

@@ -12,7 +12,7 @@ from prefect.settings import (
 )
 from prefect.settings.legacy import Setting
 
-from prefector.click.prefect_connection.options import PrefectConnectionArgs
+from prefector.prefect_connection.options import PrefectConnectionArgs
 
 
 def detect_auth_mode(args: PrefectConnectionArgs) -> Optional[str]:

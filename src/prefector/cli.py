@@ -1,7 +1,7 @@
 import click
 
-from prefector.click.blocks.cli import blocks_command
-from prefector.click.deployments.cli import deployments_command
+from prefector.blocks.cli import blocks_command
+from prefector.deployments.cli import deployments_command
 
 
 @click.group()
