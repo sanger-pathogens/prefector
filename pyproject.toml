@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [project.scripts]
-prefector = "prefector.argparse.cli:main"
+prefector = "prefector.cli:cli"
 
 [dependency-groups]
 dev = [
