@@ -1,6 +1,6 @@
-import argparse
 import json
 
+import click
 import pytest
 import requests
 from prefect.settings import (
@@ -10,7 +10,8 @@ from prefect.settings import (
     PREFECT_CLIENT_CUSTOM_HEADERS,
 )
 
-from prefector.argparse import prefect_connection as pc
+from prefector.prefect_connection import connection as pc
+from prefector.prefect_connection.options import PrefectConnectionArgs
 
 
 class _Response:
@@ -46,9 +47,9 @@ def prefect_args_defaults():
 
 
 @pytest.fixture
-def build_args(prefect_args_defaults):
+def build_connection(prefect_args_defaults):
     def _build(**overrides):
-        return argparse.Namespace(**(prefect_args_defaults | overrides))
+        return PrefectConnectionArgs(**(prefect_args_defaults | overrides))
 
     return _build
 
@@ -113,7 +114,7 @@ def test_set_bearer_token_returns_headers_json():
     assert json.loads(headers_json) == {"Authorization": "Bearer bearer-123"}
 
 
-def test_generate_prefect_settings_basic_auth(monkeypatch, build_args):
+def test_generate_prefect_settings_basic_auth(monkeypatch, build_connection):
     called = {"token": False}
 
     def _token(*_args, **_kwargs):
@@ -121,7 +122,7 @@ def test_generate_prefect_settings_basic_auth(monkeypatch, build_args):
         return "unused"
 
     monkeypatch.setattr(pc, "exchange_keycloak_token", _token)
-    settings = pc.generate_prefect_settings(build_args(api_auth_string="user:pass"))
+    settings = pc.generate_prefect_settings(build_connection(api_auth_string="user:pass"))
 
     assert settings[PREFECT_API_URL] == "http://prefect.localhost:24200/api"
     assert settings[PREFECT_API_AUTH_STRING] == "user:pass"
@@ -129,7 +130,7 @@ def test_generate_prefect_settings_basic_auth(monkeypatch, build_args):
     assert called["token"] is False
 
 
-def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_args):
+def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_connection):
     captured = {}
 
     def _token(*, token_url, form_data, ssl_cert):
@@ -140,7 +141,7 @@ def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_args):
 
     monkeypatch.setattr(pc, "exchange_keycloak_token", _token)
     settings = pc.generate_prefect_settings(
-        build_args(
+        build_connection(
             keycloak_token_url="https://keycloak/token",
             keycloak_username="alice",
             keycloak_password="secret",
@@ -159,7 +160,7 @@ def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_args):
     assert PREFECT_API_AUTH_STRING not in settings
 
 
-def test_generate_prefect_settings_client_credentials_keycloak(monkeypatch, build_args):
+def test_generate_prefect_settings_client_credentials_keycloak(monkeypatch, build_connection):
     captured = {}
 
     def _token(*, token_url, form_data, ssl_cert):
@@ -170,7 +171,7 @@ def test_generate_prefect_settings_client_credentials_keycloak(monkeypatch, buil
 
     monkeypatch.setattr(pc, "exchange_keycloak_token", _token)
     settings = pc.generate_prefect_settings(
-        build_args(
+        build_connection(
             keycloak_token_url="https://keycloak/token",
             keycloak_client_id="prefect-automation",
             keycloak_client_secret="secret-123",
@@ -188,10 +189,10 @@ def test_generate_prefect_settings_client_credentials_keycloak(monkeypatch, buil
     assert PREFECT_API_AUTH_STRING not in settings
 
 
-def test_generate_prefect_settings_rejects_multiple_auth_modes(build_args):
-    with pytest.raises(ValueError, match="mutually exclusive"):
+def test_generate_prefect_settings_rejects_multiple_auth_modes(build_connection):
+    with pytest.raises(click.UsageError, match="mutually exclusive"):
         pc.generate_prefect_settings(
-            build_args(
+            build_connection(
                 api_auth_string="user:pass",
                 keycloak_username="alice",
                 keycloak_password="secret",
@@ -208,42 +209,31 @@ def test_generate_prefect_settings_rejects_multiple_auth_modes(build_args):
         {"keycloak_client_secret": "secret-123"},
     ],
 )
-def test_generate_prefect_settings_rejects_incomplete_credential_pairs(override, build_args):
+def test_generate_prefect_settings_rejects_incomplete_credential_pairs(override, build_connection):
     with pytest.raises(ValueError, match="required together"):
-        pc.generate_prefect_settings(build_args(keycloak_token_url="https://keycloak/token", **override))
+        pc.generate_prefect_settings(build_connection(keycloak_token_url="https://keycloak/token", **override))
 
 
-def test_generate_prefect_settings_requires_keycloak_token_url_for_keycloak_modes(build_args):
-    with pytest.raises(ValueError, match="Keycloak token URL is required"):
-        pc.generate_prefect_settings(build_args(keycloak_username="alice", keycloak_password="secret"))
+def test_generate_prefect_settings_requires_keycloak_token_url_for_keycloak_modes(build_connection):
+    with pytest.raises(click.UsageError, match="Keycloak token URL is required"):
+        pc.generate_prefect_settings(build_connection(keycloak_username="alice", keycloak_password="secret"))
 
 
-def test_generate_prefect_settings_allows_no_auth_mode(build_args):
-    settings = pc.generate_prefect_settings(build_args())
+def test_generate_prefect_settings_allows_no_auth_mode(build_connection):
+    settings = pc.generate_prefect_settings(build_connection())
     assert settings[PREFECT_API_URL] == "http://prefect.localhost:24200/api"
     assert PREFECT_API_AUTH_STRING not in settings
     assert PREFECT_CLIENT_CUSTOM_HEADERS not in settings
 
 
-def test_generate_prefect_settings_includes_ssl_cert_when_exists(tmp_path, build_args):
+def test_generate_prefect_settings_includes_ssl_cert_when_exists(tmp_path, build_connection):
     cert = tmp_path / "ca.crt"
     cert.write_text("dummy cert", encoding="utf-8")
-    settings = pc.generate_prefect_settings(build_args(ssl_cert=cert))
+    settings = pc.generate_prefect_settings(build_connection(ssl_cert=cert))
     assert settings[PREFECT_API_SSL_CERT_FILE] == str(cert)
 
 
-def test_generate_prefect_settings_rejects_missing_ssl_cert(tmp_path, build_args):
+def test_generate_prefect_settings_rejects_missing_ssl_cert(tmp_path, build_connection):
     missing = tmp_path / "does-not-exist-ca.crt"
-    with pytest.raises(ValueError, match="SSL certificate file does not exist"):
-        pc.generate_prefect_settings(build_args(ssl_cert=missing))
-
-
-def test_attach_prefect_connection_options_requires_api_url_without_env(monkeypatch, capsys):
-    monkeypatch.delenv("PREFECT_API_URL", raising=False)
-    parser = argparse.ArgumentParser()
-    pc.attach_prefect_connection_options(parser)
-    with pytest.raises(SystemExit) as exc:
-        parser.parse_args([])
-    err = capsys.readouterr().err
-    assert exc.value.code == 2
-    assert "the following arguments are required: --api-url" in err
+    with pytest.raises(click.UsageError, match="SSL certificate file does not exist"):
+        pc.generate_prefect_settings(build_connection(ssl_cert=missing))

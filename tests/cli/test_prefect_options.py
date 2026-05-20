@@ -2,8 +2,8 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from prefector.click.prefect_connection.connection import detect_auth_mode
-from prefector.click.prefect_connection.options import (
+from prefector.prefect_connection.connection import detect_auth_mode
+from prefector.prefect_connection.options import (
     PrefectConnectionArgs,
     prefect_connection_options,
 )

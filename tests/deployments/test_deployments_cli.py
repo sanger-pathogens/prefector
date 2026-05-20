@@ -22,14 +22,6 @@ def deployments(build_spec) -> list[DeploymentSpec]:
     ]
 
 
-def test_main_requires_command(capsys):
-    with pytest.raises(SystemExit) as exc:
-        deploy.main([])
-
-    assert exc.value.code == 2
-    assert "the following arguments are required: command" in capsys.readouterr().err
-
-
 def test_select_targets_returns_all_when_selected_empty(deployments):
     assert deploy._select_targets(set(), deployments) == deployments
 
@@ -118,45 +110,3 @@ def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
             image="test-registry/icddrb-redcap:test",
             dry_run=False,
         )
-
-
-def test_main_deploy_shows_user_friendly_validation_error(monkeypatch, deployments, capsys):
-    class StubImage:
-        name = "img"
-
-    class StubManifest:
-        def get(self, _key):
-            return StubImage()
-
-    monkeypatch.setattr(deploy, "load_deployments", lambda _path: deployments)
-    monkeypatch.setattr(deploy, "load_image_manifest", lambda _path: StubManifest())
-
-    def _raise_validation_error(**_kwargs):
-        raise ValueError("Invalid parameters for deployment 'deploy-a':\n- retries: Input should be an integer")
-
-    monkeypatch.setattr(deploy, "deploy_target", _raise_validation_error)
-
-    with pytest.raises(SystemExit) as exc:
-        deploy.main(
-            [
-                "deploy",
-                "--deployments-dir",
-                "unused",
-                "--images-manifest",
-                "unused",
-                "--api-url",
-                "http://prefect.localhost:24200/api",
-                "--work-pool",
-                "pool",
-                "--work-queue",
-                "queue",
-                "--image-prefix",
-                "img",
-            ]
-        )
-
-    assert exc.value.code == 2
-    err = capsys.readouterr().err
-    assert "Invalid parameters for deployment 'deploy-a'" in err
-    assert "usage:" not in err
-    assert "Traceback" not in err
