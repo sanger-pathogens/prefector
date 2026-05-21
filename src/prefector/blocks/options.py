@@ -9,6 +9,7 @@ from click_option_group import optgroup
 @dataclass
 class BlockOptions:
     blocks_dir: Path
+    target: tuple[str]
 
 
 _OPTION_KEYS = {f.name for f in BlockOptions.__dataclass_fields__.values()}
@@ -22,6 +23,7 @@ def block_options(f):
         default=".",
         help="Directory containing blocks.",
     )
+    @optgroup.option("--target", help="Target blocks to list/deploy", multiple=True)
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         block_opts = BlockOptions(**{k: kwargs.pop(k) for k in _OPTION_KEYS})
