@@ -1,5 +1,7 @@
 import importlib
 import itertools
+import os
+import re
 from collections import Counter
 from pathlib import Path
 from typing import Annotated, Any
@@ -17,6 +19,34 @@ from pydantic import (
 )
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+def _substitute_env_vars(text: str, source: Path) -> str:
+    def replace(match: re.Match) -> str:
+        name = match.group(1)
+        if name not in os.environ:
+            raise ValueError(f"Environment variable '{name}' is not set (referenced in {source})")
+        return os.environ[name]
+
+    return re.sub(r"\$\{([^}]+)\}", replace, text)
+
+
+def _resolve_env_dict(env: dict[str, Any], deployment_name: str) -> dict[str, str]:
+    def resolve_value(value: Any) -> str:
+        if not isinstance(value, str):
+            return value
+
+        def replace(match: re.Match) -> str:
+            name = match.group(1)
+            if name not in os.environ:
+                raise ValueError(
+                    f"Environment variable '{name}' is not set (referenced in deployment '{deployment_name}')"
+                )
+            return os.environ[name]
+
+        return re.sub(r"\$\{([^}]+)\}", replace, value)
+
+    return {k: resolve_value(v) for k, v in env.items()}
 
 
 class ImageEntry(BaseModel):
@@ -51,6 +81,7 @@ class DeploymentSpec(BaseModel):
     cron: NonEmptyStr | None = None
     tags: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
+    env: dict[str, Any] = Field(default_factory=dict)
 
     def __str__(self) -> str:
         return f"{self.name}\n  flow: {self.flow}\n  image_key: {self.image_key}"

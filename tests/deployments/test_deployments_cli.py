@@ -1,3 +1,4 @@
+import click
 import pytest
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
@@ -37,7 +38,7 @@ def test_select_targets_deduplicates_input(deployments):
 
 
 def test_select_targets_raises_for_unknown_target(deployments):
-    with pytest.raises(ValueError, match="Unknown deployment name\\(s\\): missing"):
+    with pytest.raises(click.UsageError, match="Unknown deployment name\\(s\\): missing"):
         deploy._select_targets({"missing"}, deployments)
 
 

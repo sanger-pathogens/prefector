@@ -15,6 +15,8 @@ class DeploymentOptions:
 class DeploymentDeployOptions:
     work_pool: str
     work_queue: str
+    target: tuple[str]
+    images_manifest: Path
     image_prefix: str
     image_tag: str
     dry_run: bool
@@ -44,6 +46,12 @@ def deployment_deploy_options(f):
     @optgroup("Deploy")
     @optgroup.option("--work-pool", help="Prefect work pool.", default="default", show_default=True)
     @optgroup.option("--work-queue", help="Prefect work queue", default="default", show_default=True)
+    @optgroup.option("--target", help="Target to deploy to.", multiple=True)
+    @optgroup.option(
+        "--images-manifest",
+        type=click.Path(path_type=Path, dir_okay=False, exists=True),
+        help="Path to images manifest.",
+    )
     @optgroup.option("--image-prefix", help="Image prefix/registry, e.g. ghcr.io/org.", required=True)
     @optgroup.option("--image-tag", help="Image tag for deployment.", default="latest", show_default=True)
     @optgroup.option(
