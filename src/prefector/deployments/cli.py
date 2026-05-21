@@ -97,8 +97,8 @@ def deploy_target(  # noqa: PLR0913
         "build": False,
         "push": False,
         "print_next_steps": False,
-        "entrypoint_type": EntrypointType.MODULE_PATH,
         "job_variables": {},
+        "entrypoint_type": EntrypointType.MODULE_PATH,
     }
 
     if work_queue_name is not None:

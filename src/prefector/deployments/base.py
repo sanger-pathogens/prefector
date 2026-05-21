@@ -28,7 +28,7 @@ def _substitute_env_vars(text: str, source: Path) -> str:
             raise ValueError(f"Environment variable '{name}' is not set (referenced in {source})")
         return os.environ[name]
 
-    return re.sub(r"\$\{([^}]+)\}", replace, text)
+    return re.sub(r"\$\{([^}]+)}", replace, text)
 
 
 def _resolve_env_dict(env: dict[str, Any], deployment_name: str) -> dict[str, str]:
@@ -44,7 +44,7 @@ def _resolve_env_dict(env: dict[str, Any], deployment_name: str) -> dict[str, st
                 )
             return os.environ[name]
 
-        return re.sub(r"\$\{([^}]+)\}", replace, value)
+        return re.sub(r"\$\{([^}]+)}", replace, value)
 
     return {k: resolve_value(v) for k, v in env.items()}
 
@@ -88,10 +88,15 @@ class DeploymentSpec(BaseModel):
 
     @field_validator("flow")
     @classmethod
-    def _validate_flow(cls, value: str) -> str:
+    def _validate_flow_format(cls, value: str) -> str:
         module, separator, function = value.partition(":")
         if separator != ":" or not module or not function:
             raise ValueError("flow must use '<module>:<function>' format")
+        return value
+
+    @model_validator(mode="after")
+    def _validate_flow_importable(self) -> "DeploymentSpec":
+        module, _, function = self.flow.partition(":")
         try:
             spec = importlib.util.find_spec(module)
         except ModuleNotFoundError:
@@ -104,7 +109,7 @@ class DeploymentSpec(BaseModel):
             raise ValueError(f"flow module could not be imported: {module}") from exc
         if not hasattr(module_obj, function):
             raise ValueError(f"flow function does not exist: {module}:{function}")
-        return value
+        return self
 
     @property
     def module(self) -> str:
