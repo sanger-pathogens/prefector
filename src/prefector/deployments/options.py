@@ -46,7 +46,7 @@ def deployment_deploy_options(f):
     @optgroup("Deploy")
     @optgroup.option("--work-pool", help="Prefect work pool.", default="default", show_default=True)
     @optgroup.option("--work-queue", help="Prefect work queue", default="default", show_default=True)
-    @optgroup.option("--target", help="Target to deploy to.", multiple=True)
+    @optgroup.option("--target", help="Target flow to deploy. Omit to deploy all flows.", multiple=True)
     @optgroup.option(
         "--images-manifest",
         type=click.Path(path_type=Path, dir_okay=False, exists=True),
