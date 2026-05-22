@@ -1,5 +1,5 @@
 import functools
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import click
@@ -10,6 +10,7 @@ from click_option_group import optgroup
 class BlockOptions:
     blocks_dir: Path
     target: tuple[str]
+    sources: Path | None = field(default=None)
 
 
 _OPTION_KEYS = {f.name for f in BlockOptions.__dataclass_fields__.values()}
@@ -24,6 +25,12 @@ def block_options(f):
         help="Directory containing blocks.",
     )
     @optgroup.option("--target", help="Target blocks to list/deploy", multiple=True)
+    @optgroup.option(
+        "--sources",
+        type=click.Path(exists=True, dir_okay=False, path_type=Path),
+        default=None,
+        help=("Path to block-sources.yaml. If omitted, falls back to block-sources.yaml in --blocks-dir if present."),
+    )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
         block_opts = BlockOptions(**{k: kwargs.pop(k) for k in _OPTION_KEYS})
