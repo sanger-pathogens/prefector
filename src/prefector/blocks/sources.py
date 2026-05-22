@@ -164,8 +164,8 @@ def _build_from_keeper(block_name: str, block_cls: type[Block], source: KeeperBl
         from keeper_secrets_manager_core.storage import InMemoryKeyValueStorage  # noqa: PLC0415
     except ImportError as exc:
         raise ImportError(
-            "keeper-secrets-manager-core is required for Keeper block sources. "
-            "Install it with: pip install keeper-secrets-manager-core"
+            "Keeper Secrets Manager support requires the keeper extra. "
+            "Install it with your package manager of choice: prefector[keeper]"
         ) from exc
 
     token = source.ksm_token or None
