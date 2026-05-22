@@ -53,12 +53,6 @@ parameters:
 env:
   ENVIRONMENT: ${ENVIRONMENT}        # resolved from the environment at deploy time
   LOG_LEVEL: INFO
-git_repository:
-  url: https://gitlab.example.com/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}.git
-  commit_sha: ${CI_COMMIT_SHA}       # or: ref: ${CI_COMMIT_REF_NAME}  (branch or tag)
-  directories:
-    - flow_runtime/flows             # sparse checkout — omit to clone everything
-  credentials_block: gitlab-api-token  # name of a Prefect Secret block
 ```
 
 ### Environment variable substitution
@@ -91,37 +85,6 @@ the command will exit with an error naming the missing variable.
 - Environment variables are resolved only for deployments that are actually being
   deployed. Untargeted deployments (filtered by `--target`) and the `list`
   command do not require any variables to be set.
-
-### `git_repository` — fetching code at run time
-
-By default the flow code must be baked into the container image. Adding a
-`git_repository` section tells each worker to fetch the code from a Git
-repository before running the flow (the Prefect 3.x equivalent of `pull:` steps).
-
-```yaml
-git_repository:
-  url: https://gitlab.example.com/org/repo.git
-  commit_sha: ${CI_COMMIT_SHA}       # pin to a specific commit
-  # ref: main                        # or a branch/tag name (mutually exclusive with commit_sha)
-  directories:                       # sparse checkout — omit to clone everything
-    - flow_runtime/flows
-  credentials_block: gitlab-api-token  # name of a Prefect Secret block holding the token
-```
-
-`${VAR}` references in `url`, `commit_sha`, and `branch` are resolved from the
-environment at deploy time, so CI variables like `${CI_COMMIT_SHA}` work as
-expected.
-
-When `git_repository` is set, the `flow` field is still validated for correct
-`<module>:<function>` format but the module does not have to be importable in
-the deploy environment. The module path is used to derive the entrypoint within
-the cloned repository (e.g. `flow_runtime.flows.my_module:my_flow` →
-`flow_runtime/flows/my_module.py:my_flow`).
-
-**`credentials_block`** must be the name of a saved Prefect `Secret` block
-whose value is a personal access token (or equivalent) with read access to the
-repository. The block is loaded at deploy time via the Prefect API.
-
 
 ## Development
 
