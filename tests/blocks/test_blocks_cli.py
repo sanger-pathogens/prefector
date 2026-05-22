@@ -39,6 +39,25 @@ def test_select_targets_rejects_unknown_name():
         cli.select_targets(["missing"], specs)
 
 
+def test_deploy_block_works_without_sources(monkeypatch, tmp_path):
+    monkeypatch.setenv("VALUE", "42")
+    spec = _spec("my-block")
+    # No sources passed — falls back to spec.build() via settings_cls
+    # Patch block.save to avoid hitting Prefect API
+    monkeypatch.setattr(DummyBlock, "save", lambda self, name, overwrite=False: None)
+    cli.deploy_block(spec, sources=None)
+
+
+def test_deploy_block_uses_spec_build_for_blocks_not_in_sources(monkeypatch):
+    monkeypatch.setenv("VALUE", "42")
+    from prefector.blocks.sources import BlockSourcesConfig
+
+    sources = BlockSourcesConfig.model_validate({})  # empty sources — no entries
+    spec = _spec("my-block")
+    monkeypatch.setattr(DummyBlock, "save", lambda self, name, overwrite=False: None)
+    cli.deploy_block(spec, sources=sources)
+
+
 def test_print_blocks_uses_block_header(monkeypatch):
     buf = StringIO()
     monkeypatch.setattr(cli_module, "CONSOLE", Console(file=buf, highlight=False))
