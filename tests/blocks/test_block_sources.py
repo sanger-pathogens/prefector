@@ -310,7 +310,7 @@ def test_build_from_keeper_source_raises_on_missing_sdk():
     source = KeeperBlockSource(source="keeper", record_title="some-record")
 
     with patch.dict("sys.modules", {"keeper_secrets_manager_core": None}):
-        with pytest.raises(ImportError, match="keeper-secrets-manager-core"):
+        with pytest.raises(ImportError, match=r"prefector\[keeper\]"):
             build_block_from_source("trino", SimpleBlock, source)
 
 
