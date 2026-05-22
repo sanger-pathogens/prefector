@@ -33,6 +33,59 @@ prefector deployments deploy \
 Block spec modules must expose `BLOCKS: list[prefector.BlockSpec]`.
 Deployment specs are YAML files loaded as `prefector.DeploymentSpec`.
 
+## Deployment spec
+
+Each deployment is a YAML file. All fields except `name`, `flow`, and `image_key` are optional.
+
+```yaml
+name: my_deployment
+flow: flows.my_module:my_flow        # <module>:<function> format
+image_key: flow_runtime              # key from images manifest
+
+cron: "0 6 * * *"                   # standard cron expression
+tags:
+  - project_name
+  - bronze
+parameters:
+  retries: 3
+  bucket:
+    block: my-s3-bucket              # load a Prefect block by name at run time
+env:
+  ENVIRONMENT: ${ENVIRONMENT}        # resolved from the environment at deploy time
+  LOG_LEVEL: INFO
+```
+
+### Environment variable substitution
+
+Values in the form `${VAR_NAME}` are replaced with the corresponding environment
+variable when the spec is loaded. This happens at deploy time (e.g. in CI), not
+at flow run time.
+
+```yaml
+env:
+  COMMIT_SHA: ${CI_COMMIT_SHORT_SHA}
+  PROJECT: ${PROJECT_NAME}
+```
+
+All referenced variables must be set when `prefector deployments deploy` runs, or
+the command will exit with an error naming the missing variable.
+
+**Using environment variables in the deployment spec:**
+
+- Only `${VAR}` brace syntax is supported. A bare `$VAR` is left as-is.
+- Substitution happens on the raw text before YAML parsing. If a variable value
+  contains YAML special characters (`:`, `{`, `}`, `#`), it can produce invalid
+  YAML. Quote the value to be safe:
+  ```yaml
+  env:
+    LABEL: "${MY_LABEL}"
+  ```
+- Resolved values are stored in Prefect as `job_variables` and are visible in the
+  Prefect UI. Avoid substituting secrets this way; use Prefect blocks instead.
+- Environment variables are resolved only for deployments that are actually being
+  deployed. Untargeted deployments (filtered by `--target`) and the `list`
+  command do not require any variables to be set.
+
 ## Development
 
 Setup local environment

@@ -155,7 +155,7 @@ def deploy(connection: PrefectConnectionArgs, block_opts: BlockOptions):
     blocks_to_deploy = load_blocks(block_opts.blocks_dir)
     prefect_settings = generate_prefect_settings(connection)
 
-    targets = select_targets("", blocks_to_deploy)
+    targets = select_targets(block_opts.target, blocks_to_deploy)
 
     with temporary_settings(updates=prefect_settings):
         for index, target in enumerate(targets):

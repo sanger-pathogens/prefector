@@ -3,7 +3,14 @@ from pathlib import Path
 import pytest
 import yaml
 
-from prefector.deployments.base import DeploymentSpec, ImageManifest, load_deployments, load_image_manifest
+from prefector.deployments.base import (
+    DeploymentSpec,
+    ImageManifest,
+    _resolve_env_dict,
+    _substitute_env_vars,
+    load_deployments,
+    load_image_manifest,
+)
 
 
 def test_deployment_spec_flow_helpers(deployment_spec_dict):
@@ -169,3 +176,67 @@ def test_load_image_manifest_raises_for_duplicate_keys(tmp_path):
 
     with pytest.raises(ValueError, match="Duplicate image key\\(s\\): dbt"):
         load_image_manifest(path)
+
+
+_DUMMY_PATH = Path("dummy.yaml")
+
+
+def test_substitute_env_vars_braces_syntax(monkeypatch):
+    monkeypatch.setenv("MY_VAR", "hello")
+    assert _substitute_env_vars("value: ${MY_VAR}", _DUMMY_PATH) == "value: hello"
+
+
+def test_substitute_env_vars_multiple_references(monkeypatch):
+    monkeypatch.setenv("FOO", "foo")
+    monkeypatch.setenv("BAR", "bar")
+    result = _substitute_env_vars("a: ${FOO}\nb: ${BAR}\nc: ${FOO}", _DUMMY_PATH)
+    assert result == "a: foo\nb: bar\nc: foo"
+
+
+def test_substitute_env_vars_bare_dollar_is_not_substituted(monkeypatch):
+    monkeypatch.setenv("MY_VAR", "hello")
+    assert _substitute_env_vars("value: $MY_VAR", _DUMMY_PATH) == "value: $MY_VAR"
+
+
+def test_substitute_env_vars_raises_for_unset_variable(monkeypatch):
+    monkeypatch.delenv("MISSING_VAR", raising=False)
+    with pytest.raises(ValueError, match="'MISSING_VAR' is not set"):
+        _substitute_env_vars("value: ${MISSING_VAR}", _DUMMY_PATH)
+
+
+def test_from_yaml_preserves_raw_env_vars(tmp_path, deployment_spec_dict):
+    path = tmp_path / "spec.yaml"
+    path.write_text(
+        f"name: {deployment_spec_dict['name']}\n"
+        f"flow: {deployment_spec_dict['flow']}\n"
+        f"image_key: {deployment_spec_dict['image_key']}\n"
+        "env:\n"
+        "  ENVIRONMENT: ${ENVIRONMENT}\n"
+        "  BUCKET: ${S3_BUCKET}\n",
+        encoding="utf-8",
+    )
+
+    spec = DeploymentSpec.from_yaml(path)
+    assert spec.env == {"ENVIRONMENT": "${ENVIRONMENT}", "BUCKET": "${S3_BUCKET}"}
+
+
+def test_resolve_env_dict_substitutes_vars(monkeypatch):
+    monkeypatch.setenv("ENVIRONMENT", "staging")
+    monkeypatch.setenv("S3_BUCKET", "my-bucket")
+
+    result = _resolve_env_dict({"ENVIRONMENT": "${ENVIRONMENT}", "BUCKET": "${S3_BUCKET}"}, "my-deployment")
+
+    assert result == {"ENVIRONMENT": "staging", "BUCKET": "my-bucket"}
+
+
+def test_resolve_env_dict_raises_for_unset_var(monkeypatch):
+    monkeypatch.delenv("UNDEFINED_VAR", raising=False)
+
+    with pytest.raises(ValueError, match="'UNDEFINED_VAR' is not set"):
+        _resolve_env_dict({"KEY": "${UNDEFINED_VAR}"}, "my-deployment")
+
+
+def test_resolve_env_dict_passes_through_non_string_values():
+    result = _resolve_env_dict({"COUNT": 3, "FLAG": True}, "my-deployment")
+
+    assert result == {"COUNT": 3, "FLAG": True}

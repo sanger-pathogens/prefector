@@ -1,7 +1,11 @@
+from io import StringIO
+
 import pytest
 from prefect.blocks.core import Block
 from pydantic_settings import BaseSettings
+from rich.console import Console
 
+import prefector.blocks.cli as cli_module
 from prefector.blocks import cli
 from prefector.blocks.base import BlockSpec
 
@@ -36,12 +40,6 @@ def test_select_targets_rejects_unknown_name():
 
 
 def test_print_blocks_uses_block_header(monkeypatch):
-    from io import StringIO
-
-    from rich.console import Console
-
-    import prefector.blocks.cli as cli_module
-
     buf = StringIO()
     monkeypatch.setattr(cli_module, "CONSOLE", Console(file=buf, highlight=False))
     cli_module.print_blocks([_spec("a")])

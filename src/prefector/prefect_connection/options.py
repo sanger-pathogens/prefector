@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 
 import click
+from click import UsageError
 from click_option_group import optgroup
 
 
@@ -18,6 +19,10 @@ class PrefectConnectionArgs:
     keycloak_direct_grant_client_id: str
     keycloak_client_id: Optional[str]
     keycloak_client_secret: Optional[str]
+
+    def __post_init__(self):
+        if not self.api_url.endswith("/api"):
+            raise UsageError("Prefect API URLs must end with /api")
 
 
 _CONNECTION_KEYS = {f.name for f in PrefectConnectionArgs.__dataclass_fields__.values()}

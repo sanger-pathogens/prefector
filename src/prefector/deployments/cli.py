@@ -5,12 +5,13 @@ import logging
 from typing import Any, Iterable
 
 import click
+from click import UsageError
 from prefect.exceptions import ParameterTypeError
 from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
 from rich.console import Console
 
-from prefector.deployments.base import DeploymentSpec, load_deployments, load_image_manifest
+from prefector.deployments.base import DeploymentSpec, _resolve_env_dict, load_deployments, load_image_manifest
 from prefector.deployments.options import (
     DeploymentDeployOptions,
     DeploymentOptions,
@@ -33,7 +34,7 @@ def _select_targets(selected: Iterable[str], deployments: list[DeploymentSpec]) 
     missing = sorted(selected - set(index))
     if missing:
         available = ", ".join(sorted(deployment.name for deployment in deployments))
-        raise ValueError(f"Unknown deployment name(s): {', '.join(missing)}. Available: {available}")
+        raise UsageError(f"Unknown deployment name(s): {', '.join(missing)}. Available: {available}")
 
     return list(index.values())
 
@@ -96,6 +97,7 @@ def deploy_target(  # noqa: PLR0913
         "build": False,
         "push": False,
         "print_next_steps": False,
+        "job_variables": {},
         "entrypoint_type": EntrypointType.MODULE_PATH,
     }
 
@@ -105,6 +107,8 @@ def deploy_target(  # noqa: PLR0913
         kwargs["tags"] = spec.tags
     if spec.parameters:
         kwargs["parameters"] = spec.parameters
+    if spec.env:
+        kwargs["job_variables"]["env"] = _resolve_env_dict(spec.env, spec.name)
     if spec.cron:
         kwargs["cron"] = spec.cron
 
@@ -141,9 +145,9 @@ def deploy(
 ):
     """Deploy Prefect deployments"""
     deployments = load_deployments(deployment_opts.deployments_dir)
-    images = load_image_manifest(deployment_opts.images_manifest)
+    images = load_image_manifest(deployment_deploy_opts.images_manifest)
     prefect_settings = generate_prefect_settings(connection)
-    targets = _select_targets(deployment_opts.target, deployments)
+    targets = _select_targets(deployment_deploy_opts.target, deployments)
 
     with temporary_settings(updates=prefect_settings):
         for index, target in enumerate(targets):
