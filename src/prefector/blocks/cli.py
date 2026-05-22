@@ -12,7 +12,7 @@ from rich.console import Console
 
 from prefector.blocks.base import BlockBuildError, BlockSpec
 from prefector.blocks.options import BlockOptions, block_options
-from prefector.blocks.sources import BlockSourcesConfig, build_block_from_source, load_block_sources
+from prefector.blocks.sources import BlockSourcesConfig, build_block_from_source, load_block_sources, source_step_label
 from prefector.prefect_connection.connection import generate_prefect_settings
 from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
@@ -141,17 +141,21 @@ def deploy_block(
     sources_path: Path | None = None,
 ) -> None:
     _print_block_header(spec)
-    CONSOLE.print("[1/2] Preparing block")
+    source_entry = sources.root.get(spec.name) if sources is not None else None
+
+    label = source_step_label(source_entry, sources_path) if source_entry is not None else "Reading from environment"
 
     try:
-        if sources is not None and spec.name in sources.root:
-            block = build_block_from_source(spec.name, spec.block_cls, sources.root[spec.name], sources_path)
+        CONSOLE.print(f"[1/3] {label}")
+        CONSOLE.print("[2/3] Preparing block")
+        if source_entry is not None:
+            block = build_block_from_source(spec.name, spec.block_cls, source_entry, sources_path)
         else:
             block = spec.build()
     except (BlockBuildError, ValueError) as e:
         raise SystemExit(str(e)) from None
 
-    CONSOLE.print("[2/2] Saving block")
+    CONSOLE.print("[3/3] Saving block")
     block.save(spec.name, overwrite=True)
     CONSOLE.print("[green][✓][/green] Done")
 

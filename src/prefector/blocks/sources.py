@@ -217,6 +217,16 @@ def _keeper_field_value(record: Any, name: str) -> Any:
     return None
 
 
+def source_step_label(source: BlockSource, source_path: Path | None = None) -> str:
+    """Return a Rich-formatted step label describing where the block's values come from."""
+    resolved = _interpolate_source(source, source_path)
+    if isinstance(resolved, EnvBlockSource):
+        prefix = resolved.env_var_prefix or "(no prefix)"
+        return f"Reading from environment [dim](prefix: {prefix})[/dim]"
+    record_title = _keeper_record_title(resolved)
+    return f"Fetching from Keeper [dim]({record_title})[/dim]"
+
+
 def build_block_from_source(
     block_name: str,
     block_cls: type[Block],
