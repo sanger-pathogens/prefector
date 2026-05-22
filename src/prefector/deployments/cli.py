@@ -18,6 +18,7 @@ from prefector.deployments.options import (
     deployment_deploy_options,
     deployment_options,
 )
+from prefector.errors import handle_errors
 from prefector.prefect_connection.connection import generate_prefect_settings
 from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
@@ -149,26 +150,28 @@ def deploy(
     prefect_settings = generate_prefect_settings(connection)
     targets = _select_targets(deployment_deploy_opts.target, deployments)
 
-    with temporary_settings(updates=prefect_settings):
-        for index, target in enumerate(targets):
-            deploy_target(
-                spec=target,
-                work_pool_name=deployment_deploy_opts.work_pool,
-                work_queue_name=deployment_deploy_opts.work_queue,
-                image=_build_image_name(
-                    image_prefix=deployment_deploy_opts.image_prefix,
-                    image_name=images.get(target.image_key).name,
-                    image_tag=deployment_deploy_opts.image_tag,
-                ),
-                dry_run=deployment_deploy_opts.dry_run,
-            )
-            if index < len(targets) - 1:
-                CONSOLE.print()
+    with handle_errors():
+        with temporary_settings(updates=prefect_settings):
+            for index, target in enumerate(targets):
+                deploy_target(
+                    spec=target,
+                    work_pool_name=deployment_deploy_opts.work_pool,
+                    work_queue_name=deployment_deploy_opts.work_queue,
+                    image=_build_image_name(
+                        image_prefix=deployment_deploy_opts.image_prefix,
+                        image_name=images.get(target.image_key).name,
+                        image_tag=deployment_deploy_opts.image_tag,
+                    ),
+                    dry_run=deployment_deploy_opts.dry_run,
+                )
+                if index < len(targets) - 1:
+                    CONSOLE.print()
 
 
 @deployments_command.command(name="list")
 @deployment_options
 def list_deployments(deployment_opts: DeploymentOptions):
     """List Prefect deployments"""
-    deployments = load_deployments(deployment_opts.deployments_dir)
-    print_deployments(deployments)
+    with handle_errors():
+        deployments = load_deployments(deployment_opts.deployments_dir)
+        print_deployments(deployments)

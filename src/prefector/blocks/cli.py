@@ -10,9 +10,10 @@ import click
 from prefect.settings import temporary_settings
 from rich.console import Console
 
-from prefector.blocks.base import BlockBuildError, BlockSpec
+from prefector.blocks.base import BlockSpec
 from prefector.blocks.options import BlockOptions, block_options
 from prefector.blocks.sources import BlockSourcesConfig, build_block_from_source, load_block_sources, source_step_label
+from prefector.errors import handle_errors
 from prefector.prefect_connection.connection import generate_prefect_settings
 from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
@@ -144,17 +145,12 @@ def deploy_block(
     source_entry = sources.root.get(spec.name) if sources is not None else None
 
     label = source_step_label(source_entry, sources_path) if source_entry is not None else "Reading from environment"
-
-    try:
-        CONSOLE.print(f"[1/3] {label}")
-        CONSOLE.print("[2/3] Preparing block")
-        if source_entry is not None:
-            block = build_block_from_source(spec.name, spec.block_cls, source_entry, sources_path)
-        else:
-            block = spec.build()
-    except (BlockBuildError, ValueError) as e:
-        raise SystemExit(str(e)) from None
-
+    CONSOLE.print(f"[1/3] {label}")
+    CONSOLE.print("[2/3] Preparing block")
+    if source_entry is not None:
+        block = build_block_from_source(spec.name, spec.block_cls, source_entry, sources_path)
+    else:
+        block = spec.build()
     CONSOLE.print("[3/3] Saving block")
     block.save(spec.name, overwrite=True)
     CONSOLE.print("[green][✓][/green] Done")
@@ -171,22 +167,24 @@ def blocks_command():
 @block_options
 def deploy(connection: PrefectConnectionArgs, block_opts: BlockOptions):
     """Deploy Prefect blocks"""
-    blocks_to_deploy = load_blocks(block_opts.blocks_dir)
-    prefect_settings = generate_prefect_settings(connection)
-    sources, sources_path = _resolve_sources(block_opts)
+    with handle_errors():
+        blocks_to_deploy = load_blocks(block_opts.blocks_dir)
+        prefect_settings = generate_prefect_settings(connection)
+        sources, sources_path = _resolve_sources(block_opts)
 
-    targets = select_targets(block_opts.target, blocks_to_deploy)
+        targets = select_targets(block_opts.target, blocks_to_deploy)
 
-    with temporary_settings(updates=prefect_settings):
-        for index, target in enumerate(targets):
-            deploy_block(target, sources=sources, sources_path=sources_path)
-            if index < len(targets) - 1:
-                CONSOLE.print()
+        with temporary_settings(updates=prefect_settings):
+            for index, target in enumerate(targets):
+                deploy_block(target, sources=sources, sources_path=sources_path)
+                if index < len(targets) - 1:
+                    CONSOLE.print()
 
 
 @blocks_command.command(name="list")
 @block_options
 def list_blocks(block_opts: BlockOptions):
     """List Prefect blocks"""
-    blocks = load_blocks(block_opts.blocks_dir)
-    print_blocks(blocks)
+    with handle_errors():
+        blocks = load_blocks(block_opts.blocks_dir)
+        print_blocks(blocks)

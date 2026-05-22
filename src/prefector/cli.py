@@ -5,8 +5,12 @@ from prefector.deployments.cli import deployments_command
 
 
 @click.group()
-def cli():
+@click.option("--debug", default=False, help="Show full tracebacks on error.")
+@click.pass_context
+def cli(ctx, debug):
     """Manage Prefect resources from reusable specs."""
+    ctx.ensure_object(dict)
+    ctx.obj["debug"] = debug
 
 
 cli.add_command(blocks_command)
