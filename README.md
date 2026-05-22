@@ -155,11 +155,8 @@ The full record title is assembled as
 `<record_prefix><separator><record_title><separator><record_suffix>`, with any
 absent components skipped cleanly (no leading or trailing separator):
 
-The Keeper SDK (`keeper-secrets-manager-core`) must be installed separately:
-
-```bash
-pip install keeper-secrets-manager-core
-```
+The Keeper SDK (`keeper-secrets-manager-core`) must be installed to read values from Keeper. The
+extra `prefector[keeper]` provides this.
 
 ### Environment variable substitution
 
