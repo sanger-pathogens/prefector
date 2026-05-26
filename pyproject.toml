@@ -19,6 +19,11 @@ dependencies = [
   "prefect-aws (>=0.6.9,<0.8.0)",
 ]
 
+[project.optional-dependencies]
+keeper = [
+  "keeper-secrets-manager-core",
+]
+
 [project.scripts]
 prefector = "prefector.cli:cli"
 

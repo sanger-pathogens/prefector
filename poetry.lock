@@ -1786,6 +1786,24 @@ files = [
 referencing = ">=0.31.0"
 
 [[package]]
+name = "keeper-secrets-manager-core"
+version = "17.2.1"
+description = "Keeper Secrets Manager for Python 3"
+optional = true
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "extra == \"keeper\""
+files = [
+    {file = "keeper_secrets_manager_core-17.2.1-py3-none-any.whl", hash = "sha256:a8c078da460762b26470516b656f3c88dd5ce8d61f151bfabfa45b20b551f0a6"},
+    {file = "keeper_secrets_manager_core-17.2.1.tar.gz", hash = "sha256:2414abf10711f7f6918edb47454706986a08099affbfeb92b1fad626cb37dd11"},
+]
+
+[package.dependencies]
+cryptography = ">=46.0.5"
+requests = ">=2.32.4"
+urllib3 = ">=2.6.3"
+
+[[package]]
 name = "mako"
 version = "1.3.12"
 description = "A super-fast templating language that borrows the best ideas from the existing templating languages."
@@ -4466,7 +4484,10 @@ enabler = ["pytest-enabler (>=2.2)"]
 test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_itertools", "pytest (>=6,!=8.1.*)", "pytest-ignore-flaky"]
 type = ["pytest-mypy"]
 
+[extras]
+keeper = ["keeper-secrets-manager-core"]
+
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.14"
-content-hash = "f2c6e819cff269c7b86a20cd08fc42c06c4efed8648815217d957a15e6f69f64"
+content-hash = "a64320ce1e303c9c943643724a1617a7d670ee20ad32646b1ecbffc6fd165c58"
