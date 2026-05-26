@@ -139,44 +139,44 @@ def _object_not_found():
     return ObjectNotFound(httpx.HTTPStatusError("404", request=req, response=resp))
 
 
-def test_find_deployment_by_slash_name():
+def test_find_deployments_by_slash_name_returns_single():
     mock_deployment = MagicMock()
     client = AsyncMock()
     client.read_deployment_by_name.return_value = mock_deployment
 
-    result = anyio.run(deploy._find_deployment, client, "my-flow/my-deployment")
+    result = anyio.run(deploy._find_deployments, client, "my-flow/my-deployment")
 
-    assert result is mock_deployment
+    assert result == [mock_deployment]
     client.read_deployment_by_name.assert_called_once_with("my-flow/my-deployment")
 
 
-def test_find_deployment_raises_for_not_found_slash_name():
+def test_find_deployments_raises_for_not_found_slash_name():
     client = AsyncMock()
     client.read_deployment_by_name.side_effect = _object_not_found()
 
     with pytest.raises(ValueError, match="Deployment 'my-flow/foo' not found"):
-        anyio.run(deploy._find_deployment, client, "my-flow/foo")
+        anyio.run(deploy._find_deployments, client, "my-flow/foo")
 
 
-def test_find_deployment_by_bare_name():
-    mock_deployment = MagicMock()
+def test_find_deployments_by_bare_name_returns_all_matches():
+    d1, d2 = MagicMock(), MagicMock()
     client = AsyncMock()
-    client.read_deployments.return_value = [mock_deployment]
+    client.read_deployments.return_value = [d1, d2]
 
-    result = anyio.run(deploy._find_deployment, client, "my-deployment")
+    result = anyio.run(deploy._find_deployments, client, "my-deployment")
 
-    assert result is mock_deployment
+    assert result == [d1, d2]
 
 
-def test_find_deployment_raises_when_no_match():
+def test_find_deployments_raises_when_no_match():
     client = AsyncMock()
     client.read_deployments.side_effect = [[], []]
 
     with pytest.raises(ValueError, match="No deployment named 'foo'"):
-        anyio.run(deploy._find_deployment, client, "foo")
+        anyio.run(deploy._find_deployments, client, "foo")
 
 
-def test_find_deployment_lists_available_in_error():
+def test_find_deployments_lists_available_in_error():
     available = MagicMock()
     available.flow_name = "some-flow"
     available.name = "other-deployment"
@@ -184,18 +184,7 @@ def test_find_deployment_lists_available_in_error():
     client.read_deployments.side_effect = [[], [available]]
 
     with pytest.raises(ValueError, match="some-flow/other-deployment"):
-        anyio.run(deploy._find_deployment, client, "foo")
-
-
-def test_find_deployment_raises_when_multiple_matches():
-    d1, d2 = MagicMock(), MagicMock()
-    d1.flow_name, d1.name = "flow-a", "my-deployment"
-    d2.flow_name, d2.name = "flow-b", "my-deployment"
-    client = AsyncMock()
-    client.read_deployments.return_value = [d1, d2]
-
-    with pytest.raises(ValueError, match="Multiple deployments named 'my-deployment'"):
-        anyio.run(deploy._find_deployment, client, "my-deployment")
+        anyio.run(deploy._find_deployments, client, "foo")
 
 
 def test_find_deployments_by_tags_returns_matches():
@@ -216,9 +205,9 @@ def test_find_deployments_by_tags_raises_when_no_match():
         anyio.run(deploy._find_deployments_by_tags, client, ["nightly", "prod"])
 
 
-def _make_flow_run(final: bool, completed: bool = True, state_name: str = "Completed"):
+def _make_flow_run(run_id: str, final: bool, completed: bool = True, state_name: str = "Completed"):
     flow_run = MagicMock()
-    flow_run.id = "run-123"
+    flow_run.id = run_id
     flow_run.state = MagicMock()
     flow_run.state.is_final.return_value = final
     flow_run.state.is_completed.return_value = completed
@@ -226,30 +215,37 @@ def _make_flow_run(final: bool, completed: bool = True, state_name: str = "Compl
     return flow_run
 
 
-def test_run_deployment_no_watch(monkeypatch):
-    flow_run = _make_flow_run(final=False)
-    monkeypatch.setattr(deploy, "_prefect", lambda fn: flow_run)
-
-    deploy._run_deployment(MagicMock(), watch=False)
-
-
-def test_run_deployment_watch_polls_until_final(monkeypatch):
-    pending = _make_flow_run(final=False)
-    pending.state = None
-    completed = _make_flow_run(final=True, completed=True)
+def test_watch_flow_runs_polls_until_all_final(monkeypatch):
+    pending = _make_flow_run("run-1", final=False)
+    completed = _make_flow_run("run-1", final=True, completed=True)
     calls = iter([pending, completed])
     monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
     monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
 
-    deploy._run_deployment(MagicMock(), watch=True)
+    deploy._watch_flow_runs([("my-flow/my-deployment", pending)])
 
 
-def test_run_deployment_watch_raises_on_failed_state(monkeypatch):
-    failed = _make_flow_run(final=True, completed=False, state_name="Failed")
-    monkeypatch.setattr(deploy, "_prefect", lambda fn: failed)
+def test_watch_flow_runs_raises_when_any_failed(monkeypatch):
+    ok = _make_flow_run("run-1", final=True, completed=True)
+    failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
+    calls = iter([ok, failed])
+    monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
 
-    with pytest.raises(click.ClickException, match="Flow run ended in state: Failed"):
-        deploy._run_deployment(MagicMock(), watch=True)
+    with pytest.raises(click.ClickException, match="orchestrator-b"):
+        deploy._watch_flow_runs([("orchestrator-a", ok), ("orchestrator-b", failed)])
+
+
+def test_watch_flow_runs_waits_for_all_before_raising(monkeypatch):
+    """All runs are triggered and polled before the error is raised."""
+    ok = _make_flow_run("run-1", final=True, completed=True)
+    failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
+    calls = iter([ok, failed])
+    monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
+
+    with pytest.raises(click.ClickException, match="did not complete"):
+        deploy._watch_flow_runs([("a", ok), ("b", failed)])
 
 
 def test_run_flow_requires_name_or_tag(base_args):

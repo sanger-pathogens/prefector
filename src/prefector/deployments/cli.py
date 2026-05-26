@@ -185,10 +185,10 @@ def _deployment_label(d) -> str:
     return f"{flow}/{d.name}" if flow else d.name
 
 
-async def _find_deployment(client, name: str):
+async def _find_deployments(client, name: str) -> list:
     if "/" in name:
         try:
-            return await client.read_deployment_by_name(name)
+            return [await client.read_deployment_by_name(name)]
         except ObjectNotFound:
             raise ValueError(f"Deployment '{name}' not found") from None
     matches = await client.read_deployments(deployment_filter=DeploymentFilter(name=DeploymentFilterName(any_=[name])))
@@ -196,10 +196,7 @@ async def _find_deployment(client, name: str):
         all_deployments = await client.read_deployments()
         available = ", ".join(f"'{_deployment_label(d)}'" for d in all_deployments) or "none"
         raise ValueError(f"No deployment named '{name}'. Available: {available}")
-    if len(matches) > 1:
-        options = ", ".join(f"'{_deployment_label(m)}'" for m in matches)
-        raise ValueError(f"Multiple deployments named '{name}': {options}. Use flow/deployment format.")
-    return matches[0]
+    return matches
 
 
 async def _find_deployments_by_tags(client, tags: list[str]):
@@ -209,26 +206,31 @@ async def _find_deployments_by_tags(client, tags: list[str]):
     return matches
 
 
-def _run_deployment(deployment, watch: bool) -> None:
-    flow_run = _prefect(lambda c: c.create_flow_run_from_deployment(deployment.id))
-    CONSOLE.print(f"[green][✓][/green] Flow run created (ID: {flow_run.id})")
+def _watch_flow_runs(labeled_runs: list[tuple[str, Any]]) -> None:
+    pending = {fr.id: (label, fr) for label, fr in labeled_runs}
+    failed = []
 
-    if watch:
-        while flow_run.state is None or not flow_run.state.is_final():
-            time.sleep(5)
-            flow_run = _prefect(lambda c, run_id=flow_run.id: c.read_flow_run(run_id))
-        state = flow_run.state
-        color = "green" if state.is_completed() else "red"
-        CONSOLE.print(f"Final state: [{color}]{state.name}[/{color}]")
-        if not state.is_completed():
-            raise click.ClickException(f"Flow run ended in state: {state.name}")
+    while pending:
+        time.sleep(5)
+        for run_id in list(pending):
+            label, _ = pending[run_id]
+            fr = _prefect(lambda c, rid=run_id: c.read_flow_run(rid))
+            if fr.state is not None and fr.state.is_final():
+                del pending[run_id]
+                color = "green" if fr.state.is_completed() else "red"
+                CONSOLE.print(f"[{color}]{label}: {fr.state.name}[/{color}]")
+                if not fr.state.is_completed():
+                    failed.append(label)
+
+    if failed:
+        raise click.ClickException(f"Flow run(s) did not complete: {', '.join(failed)}")
 
 
 @deployments_command.command(name="run")
 @prefect_connection_options
 @click.argument("deployment_name", required=False, default=None)
 @click.option("--tag", "tags", multiple=True, help="Run all deployments with this tag (repeatable).")
-@click.option("--watch", is_flag=True, default=False, help="Wait for each flow run to complete.")
+@click.option("--watch", is_flag=True, default=False, help="Wait for all flow runs to complete.")
 def run_flow(connection: PrefectConnectionArgs, deployment_name: str | None, tags: tuple[str, ...], watch: bool):
     """Trigger one or more Prefect deployments by name or tag"""
     if not deployment_name and not tags:
@@ -241,15 +243,20 @@ def run_flow(connection: PrefectConnectionArgs, deployment_name: str | None, tag
     with handle_errors():
         with temporary_settings(updates=prefect_settings):
             if deployment_name:
-                deployments = [_prefect(lambda c: _find_deployment(c, deployment_name))]
+                deployments = _prefect(lambda c: _find_deployments(c, deployment_name))
             else:
                 deployments = _prefect(lambda c: _find_deployments_by_tags(c, list(tags)))
 
-            for index, deployment in enumerate(deployments):
-                CONSOLE.print(f"Triggering deployment [bold]{_deployment_label(deployment)}[/bold]")
-                _run_deployment(deployment, watch)
-                if index < len(deployments) - 1:
-                    CONSOLE.print()
+            labeled_runs = []
+            for deployment in deployments:
+                label = _deployment_label(deployment)
+                CONSOLE.print(f"Triggering [bold]{label}[/bold]")
+                flow_run = _prefect(lambda c, did=deployment.id: c.create_flow_run_from_deployment(did))
+                CONSOLE.print(f"[green][✓][/green] Run ID: {flow_run.id}")
+                labeled_runs.append((label, flow_run))
+
+            if watch:
+                _watch_flow_runs(labeled_runs)
 
 
 @deployments_command.command(name="list")
