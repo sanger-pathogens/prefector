@@ -191,10 +191,8 @@ def _build_from_keeper(block_name: str, block_cls: type[Block], source: KeeperBl
         return block_cls(**values)
     except ValidationError as exc:
         missing = [str(e["loc"][0]) for e in exc.errors() if e["type"] == "missing"]
-        raise ValueError(
-            f"Failed to build block '{block_name}' from Keeper record '{record_title}': "
-            f"missing required fields: {', '.join(missing)}"
-        ) from None
+        detail = f"missing required fields: {', '.join(missing)}" if missing else str(exc)
+        raise ValueError(f"Failed to build block '{block_name}' from Keeper record '{record_title}': {detail}") from exc
 
 
 def _keeper_field_value(record: Any, name: str) -> Any:
