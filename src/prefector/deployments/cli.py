@@ -2,11 +2,15 @@ import contextlib
 import importlib
 import io
 import logging
+import time
 from typing import Any, Iterable
 
+import anyio
 import click
 from click import UsageError
-from prefect.exceptions import ParameterTypeError
+from prefect.client.orchestration import get_client
+from prefect.client.schemas.filters import DeploymentFilter, DeploymentFilterName, DeploymentFilterTags
+from prefect.exceptions import ObjectNotFound, ParameterTypeError
 from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
 from rich.console import Console
@@ -165,6 +169,86 @@ def deploy(
                     dry_run=deployment_deploy_opts.dry_run,
                 )
                 if index < len(targets) - 1:
+                    CONSOLE.print()
+
+
+def _prefect(coro_fn):
+    async def _run():
+        async with get_client() as client:
+            return await coro_fn(client)
+
+    return anyio.run(_run)
+
+
+def _deployment_label(d) -> str:
+    flow = getattr(d, "flow_name", None)
+    return f"{flow}/{d.name}" if flow else d.name
+
+
+async def _find_deployment(client, name: str):
+    if "/" in name:
+        try:
+            return await client.read_deployment_by_name(name)
+        except ObjectNotFound:
+            raise ValueError(f"Deployment '{name}' not found") from None
+    matches = await client.read_deployments(deployment_filter=DeploymentFilter(name=DeploymentFilterName(any_=[name])))
+    if not matches:
+        all_deployments = await client.read_deployments()
+        available = ", ".join(f"'{_deployment_label(d)}'" for d in all_deployments) or "none"
+        raise ValueError(f"No deployment named '{name}'. Available: {available}")
+    if len(matches) > 1:
+        options = ", ".join(f"'{_deployment_label(m)}'" for m in matches)
+        raise ValueError(f"Multiple deployments named '{name}': {options}. Use flow/deployment format.")
+    return matches[0]
+
+
+async def _find_deployments_by_tags(client, tags: list[str]):
+    matches = await client.read_deployments(deployment_filter=DeploymentFilter(tags=DeploymentFilterTags(all_=tags)))
+    if not matches:
+        raise ValueError(f"No deployments found with tags: {', '.join(tags)}")
+    return matches
+
+
+def _run_deployment(deployment, watch: bool) -> None:
+    flow_run = _prefect(lambda c: c.create_flow_run_from_deployment(deployment.id))
+    CONSOLE.print(f"[green][✓][/green] Flow run created (ID: {flow_run.id})")
+
+    if watch:
+        while flow_run.state is None or not flow_run.state.is_final():
+            time.sleep(5)
+            flow_run = _prefect(lambda c, run_id=flow_run.id: c.read_flow_run(run_id))
+        state = flow_run.state
+        color = "green" if state.is_completed() else "red"
+        CONSOLE.print(f"Final state: [{color}]{state.name}[/{color}]")
+        if not state.is_completed():
+            raise click.ClickException(f"Flow run ended in state: {state.name}")
+
+
+@deployments_command.command(name="run")
+@prefect_connection_options
+@click.argument("deployment_name", required=False, default=None)
+@click.option("--tag", "tags", multiple=True, help="Run all deployments with this tag (repeatable).")
+@click.option("--watch", is_flag=True, default=False, help="Wait for each flow run to complete.")
+def run_flow(connection: PrefectConnectionArgs, deployment_name: str | None, tags: tuple[str, ...], watch: bool):
+    """Trigger one or more Prefect deployments by name or tag"""
+    if not deployment_name and not tags:
+        raise click.UsageError("Provide a deployment name or --tag.")
+    if deployment_name and tags:
+        raise click.UsageError("Provide a deployment name or --tag, not both.")
+
+    prefect_settings = generate_prefect_settings(connection)
+
+    with handle_errors():
+        with temporary_settings(updates=prefect_settings):
+            if deployment_name:
+                deployments = [_prefect(lambda c: _find_deployment(c, deployment_name))]
+            else:
+                deployments = _prefect(lambda c: _find_deployments_by_tags(c, list(tags)))
+
+            for index, deployment in enumerate(deployments):
+                CONSOLE.print(f"Triggering deployment [bold]{_deployment_label(deployment)}[/bold]")
+                _run_deployment(deployment, watch)
+                if index < len(deployments) - 1:
                     CONSOLE.print()
 
 
