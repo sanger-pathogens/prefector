@@ -6,6 +6,8 @@ Reusable CLI helpers for deploying Prefect blocks and deployments from downstrea
 project specs. Provides a CI-first approach to managing Prefect resources as code, stored alongside
 flows and data pipelines.
 
+For more detailed documentation, visit the [project wiki](https://github.com/sanger-pathogens/prefector/wiki)
+
 ## Install
 
 Install `prefector` into the same Python environment as the block specs, flow
