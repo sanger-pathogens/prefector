@@ -3,7 +3,8 @@
 [![Tests](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml/badge.svg)](https://github.com/sanger-pathogens/prefector/actions/workflows/test.yml)
 
 Reusable CLI helpers for deploying Prefect blocks and deployments from downstream
-project specs.
+project specs. Provides a CI-first approach to managing Prefect resources as code, stored alongside
+flows and data pipelines.
 
 ## Install
 
