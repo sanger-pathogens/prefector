@@ -3,8 +3,7 @@ from prefect.blocks.core import Block
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from prefector.blocks.base import BlockBuildError, BlockSpec, settings_model_for_block
-from prefector.blocks.cli import _validate_specs, load_blocks
+from prefector.blocks.base import BlockBuildError, BlockSpec, _validate_specs, load_blocks, settings_model_for_block
 
 
 class DummyBlock(Block):

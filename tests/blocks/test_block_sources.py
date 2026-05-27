@@ -321,7 +321,7 @@ def test_resolve_sources_uses_explicit_flag(tmp_path):
         encoding="utf-8",
     )
 
-    from prefector.blocks.cli import _resolve_sources
+    from prefector.blocks.deploy import _resolve_sources
     from prefector.blocks.options import BlockOptions
 
     opts = BlockOptions(blocks_dir=tmp_path, target=(), sources=sources_file)
@@ -337,7 +337,7 @@ def test_resolve_sources_falls_back_to_blocks_dir(tmp_path):
         encoding="utf-8",
     )
 
-    from prefector.blocks.cli import _resolve_sources
+    from prefector.blocks.deploy import _resolve_sources
     from prefector.blocks.options import BlockOptions
 
     opts = BlockOptions(blocks_dir=tmp_path, target=(), sources=None)
@@ -348,7 +348,7 @@ def test_resolve_sources_falls_back_to_blocks_dir(tmp_path):
 
 
 def test_resolve_sources_returns_none_when_absent(tmp_path):
-    from prefector.blocks.cli import _resolve_sources
+    from prefector.blocks.deploy import _resolve_sources
     from prefector.blocks.options import BlockOptions
 
     opts = BlockOptions(blocks_dir=tmp_path, target=(), sources=None)
