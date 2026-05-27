@@ -9,7 +9,8 @@ from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
 from prefect.exceptions import ObjectNotFound
 
-import prefector.deployments.cli as deploy
+import prefector.deployments.deploy as deploy_cmd
+import prefector.deployments.run as run_cmd
 from prefector.cli import cli
 from prefector.deployments.base import DeploymentSpec
 
@@ -31,26 +32,26 @@ def deployments(build_spec) -> list[DeploymentSpec]:
 
 
 def test_select_targets_returns_all_when_selected_empty(deployments):
-    assert deploy._select_targets(set(), deployments) == deployments
+    assert deploy_cmd._select_targets(set(), deployments) == deployments
 
 
 def test_select_targets_returns_only_selected(deployments):
-    selected = deploy._select_targets(["deploy-b"], deployments)
+    selected = deploy_cmd._select_targets(["deploy-b"], deployments)
     assert [item.name for item in selected] == ["deploy-b"]
 
 
 def test_select_targets_deduplicates_input(deployments):
-    selected = deploy._select_targets(["deploy-b", "deploy-b"], deployments)
+    selected = deploy_cmd._select_targets(["deploy-b", "deploy-b"], deployments)
     assert [item.name for item in selected] == ["deploy-b"]
 
 
 def test_select_targets_raises_for_unknown_target(deployments):
     with pytest.raises(click.UsageError, match="Unknown deployment name\\(s\\): missing"):
-        deploy._select_targets({"missing"}, deployments)
+        deploy_cmd._select_targets({"missing"}, deployments)
 
 
 def test_build_image_name_builds_from_prefix_and_manifest_name():
-    result = deploy._build_image_name(
+    result = deploy_cmd._build_image_name(
         image_prefix="ghcr.io/acme/",
         image_name="icddrb-dbt",
         image_tag="2026.03.26",
@@ -60,7 +61,7 @@ def test_build_image_name_builds_from_prefix_and_manifest_name():
 
 
 def test_build_image_name_supports_empty_prefix():
-    result = deploy._build_image_name(image_prefix="", image_name="icddrb-dbt", image_tag="latest")
+    result = deploy_cmd._build_image_name(image_prefix="", image_name="icddrb-dbt", image_tag="latest")
 
     assert result == "icddrb-dbt:latest"
 
@@ -85,7 +86,7 @@ def test_deploy_target(monkeypatch, prefect_test_fixture, deployment_spec_dict, 
 
     monkeypatch.chdir(deployment_flow_dir)
 
-    deploy.deploy_target(
+    deploy_cmd.deploy_target(
         spec=spec,
         work_pool_name=pool_name,
         work_queue_name=None,
@@ -111,7 +112,7 @@ def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
     spec = DeploymentSpec(**(deployment_spec_dict | {"parameters": {"retries": "three"}}))
 
     with pytest.raises(ValueError, match="Invalid parameters for deployment 'deploy-a'"):
-        deploy.deploy_target(
+        deploy_cmd.deploy_target(
             spec=spec,
             work_pool_name="test-pool",
             work_queue_name=None,
@@ -124,13 +125,13 @@ def test_deployment_label_with_flow_name():
     d = MagicMock()
     d.flow_name = "my-flow"
     d.name = "my-deployment"
-    assert deploy._deployment_label(d) == "my-flow/my-deployment"
+    assert run_cmd._deployment_label(d) == "my-flow/my-deployment"
 
 
 def test_deployment_label_falls_back_to_name():
     d = MagicMock(spec=["name"])
     d.name = "my-deployment"
-    assert deploy._deployment_label(d) == "my-deployment"
+    assert run_cmd._deployment_label(d) == "my-deployment"
 
 
 def _object_not_found():
@@ -144,7 +145,7 @@ def test_find_deployments_by_slash_name_returns_single():
     client = AsyncMock()
     client.read_deployment_by_name.return_value = mock_deployment
 
-    result = anyio.run(deploy._find_deployments, client, "my-flow/my-deployment")
+    result = anyio.run(run_cmd._find_deployments, client, "my-flow/my-deployment")
 
     assert result == [mock_deployment]
     client.read_deployment_by_name.assert_called_once_with("my-flow/my-deployment")
@@ -155,7 +156,7 @@ def test_find_deployments_raises_for_not_found_slash_name():
     client.read_deployment_by_name.side_effect = _object_not_found()
 
     with pytest.raises(ValueError, match="Deployment 'my-flow/foo' not found"):
-        anyio.run(deploy._find_deployments, client, "my-flow/foo")
+        anyio.run(run_cmd._find_deployments, client, "my-flow/foo")
 
 
 def test_find_deployments_by_bare_name_returns_all_matches():
@@ -163,7 +164,7 @@ def test_find_deployments_by_bare_name_returns_all_matches():
     client = AsyncMock()
     client.read_deployments.return_value = [d1, d2]
 
-    result = anyio.run(deploy._find_deployments, client, "my-deployment")
+    result = anyio.run(run_cmd._find_deployments, client, "my-deployment")
 
     assert result == [d1, d2]
 
@@ -173,7 +174,7 @@ def test_find_deployments_raises_when_no_match():
     client.read_deployments.side_effect = [[], []]
 
     with pytest.raises(ValueError, match="No deployment named 'foo'"):
-        anyio.run(deploy._find_deployments, client, "foo")
+        anyio.run(run_cmd._find_deployments, client, "foo")
 
 
 def test_find_deployments_lists_available_in_error():
@@ -184,7 +185,7 @@ def test_find_deployments_lists_available_in_error():
     client.read_deployments.side_effect = [[], [available]]
 
     with pytest.raises(ValueError, match="some-flow/other-deployment"):
-        anyio.run(deploy._find_deployments, client, "foo")
+        anyio.run(run_cmd._find_deployments, client, "foo")
 
 
 def test_find_deployments_by_tags_returns_matches():
@@ -192,7 +193,7 @@ def test_find_deployments_by_tags_returns_matches():
     client = AsyncMock()
     client.read_deployments.return_value = [d]
 
-    result = anyio.run(deploy._find_deployments_by_tags, client, ["tag1", "tag2"])
+    result = anyio.run(run_cmd._find_deployments_by_tags, client, ["tag1", "tag2"])
 
     assert result == [d]
 
@@ -202,7 +203,7 @@ def test_find_deployments_by_tags_raises_when_no_match():
     client.read_deployments.return_value = []
 
     with pytest.raises(ValueError, match="No deployments found with tags: nightly, prod"):
-        anyio.run(deploy._find_deployments_by_tags, client, ["nightly", "prod"])
+        anyio.run(run_cmd._find_deployments_by_tags, client, ["nightly", "prod"])
 
 
 def _make_flow_run(run_id: str, final: bool, completed: bool = True, state_name: str = "Completed"):
@@ -219,21 +220,21 @@ def test_watch_flow_runs_polls_until_all_final(monkeypatch):
     pending = _make_flow_run("run-1", final=False)
     completed = _make_flow_run("run-1", final=True, completed=True)
     calls = iter([pending, completed])
-    monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
-    monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
+    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
-    deploy._watch_flow_runs([("my-flow/my-deployment", pending)])
+    run_cmd._watch_flow_runs([("my-flow/my-deployment", pending)])
 
 
 def test_watch_flow_runs_raises_when_any_failed(monkeypatch):
     ok = _make_flow_run("run-1", final=True, completed=True)
     failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
     calls = iter([ok, failed])
-    monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
-    monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
+    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
     with pytest.raises(click.ClickException, match="orchestrator-b"):
-        deploy._watch_flow_runs([("orchestrator-a", ok), ("orchestrator-b", failed)])
+        run_cmd._watch_flow_runs([("orchestrator-a", ok), ("orchestrator-b", failed)])
 
 
 def test_watch_flow_runs_waits_for_all_before_raising(monkeypatch):
@@ -241,11 +242,11 @@ def test_watch_flow_runs_waits_for_all_before_raising(monkeypatch):
     ok = _make_flow_run("run-1", final=True, completed=True)
     failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
     calls = iter([ok, failed])
-    monkeypatch.setattr(deploy, "_prefect", lambda fn: next(calls))
-    monkeypatch.setattr(deploy.time, "sleep", lambda _: None)
+    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
     with pytest.raises(click.ClickException, match="did not complete"):
-        deploy._watch_flow_runs([("a", ok), ("b", failed)])
+        run_cmd._watch_flow_runs([("a", ok), ("b", failed)])
 
 
 def test_run_flow_requires_name_or_tag(base_args):

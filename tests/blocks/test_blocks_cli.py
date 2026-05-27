@@ -5,8 +5,9 @@ from prefect.blocks.core import Block
 from pydantic_settings import BaseSettings
 from rich.console import Console
 
-import prefector.blocks.cli as cli_module
-from prefector.blocks import cli
+import prefector.blocks.list as list_module
+from prefector.blocks import base
+from prefector.blocks import deploy as deploy_module
 from prefector.blocks.base import BlockSpec
 
 
@@ -24,19 +25,19 @@ def _spec(name: str) -> BlockSpec:
 
 def test_select_targets_returns_all_when_empty():
     specs = [_spec("a"), _spec("b")]
-    assert cli.select_targets([], specs) == specs
+    assert base.select_targets([], specs) == specs
 
 
 def test_select_targets_filters_requested_names():
     specs = [_spec("a"), _spec("b")]
-    selected = cli.select_targets(["b"], specs)
+    selected = base.select_targets(["b"], specs)
     assert [spec.name for spec in selected] == ["b"]
 
 
 def test_select_targets_rejects_unknown_name():
     specs = [_spec("a")]
     with pytest.raises(ValueError, match="Unknown block name\\(s\\): missing"):
-        cli.select_targets(["missing"], specs)
+        base.select_targets(["missing"], specs)
 
 
 def test_deploy_block_works_without_sources(monkeypatch, tmp_path):
@@ -45,7 +46,7 @@ def test_deploy_block_works_without_sources(monkeypatch, tmp_path):
     # No sources passed — falls back to spec.build() via settings_cls
     # Patch block.save to avoid hitting Prefect API
     monkeypatch.setattr(DummyBlock, "save", lambda self, name, overwrite=False: None)
-    cli.deploy_block(spec, sources=None)
+    deploy_module.deploy_block(spec, sources=None)
 
 
 def test_deploy_block_uses_spec_build_for_blocks_not_in_sources(monkeypatch):
@@ -55,13 +56,13 @@ def test_deploy_block_uses_spec_build_for_blocks_not_in_sources(monkeypatch):
     sources = BlockSourcesConfig.model_validate({})  # empty sources — no entries
     spec = _spec("my-block")
     monkeypatch.setattr(DummyBlock, "save", lambda self, name, overwrite=False: None)
-    cli.deploy_block(spec, sources=sources)
+    deploy_module.deploy_block(spec, sources=sources)
 
 
 def test_print_blocks_uses_block_header(monkeypatch):
     buf = StringIO()
-    monkeypatch.setattr(cli_module, "CONSOLE", Console(file=buf, highlight=False))
-    cli_module.print_blocks([_spec("a")])
+    monkeypatch.setattr(list_module, "CONSOLE", Console(file=buf, highlight=False))
+    list_module.print_blocks([_spec("a")])
     out = buf.getvalue()
     assert "a" in out
     assert "DummyBlock" in out
