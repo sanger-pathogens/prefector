@@ -17,6 +17,7 @@ class EnvBlockSource(BaseModel):
     source: Literal["env"]
     env_var_prefix: str = ""
     fields: dict[str, str] = Field(default_factory=dict)  # block_field -> env_var_suffix
+    blocks: dict[str, str] = Field(default_factory=dict)  # block_field -> deployed block name
 
 
 class KeeperBlockSource(BaseModel):
@@ -29,6 +30,7 @@ class KeeperBlockSource(BaseModel):
     separator: str = ":"
     ksm_token: str = ""
     fields: dict[str, str] = Field(default_factory=dict)  # block_field -> KSM field title
+    blocks: dict[str, str] = Field(default_factory=dict)  # block_field -> deployed block name
 
 
 BlockSource = Annotated[EnvBlockSource | KeeperBlockSource, Field(discriminator="source")]
@@ -146,6 +148,38 @@ def _parse_nested_mappings(source_fields: dict[str, str]) -> dict[str, dict[str,
     return nested
 
 
+def _load_block_refs(block_cls: type[Block], block_refs: dict[str, str]) -> dict[str, Any]:
+    """Load named Prefect blocks for fields declared in the 'blocks' config section.
+
+    Handles Union-typed fields (e.g. Union[MinIOCredentials, AwsCredentials]) by trying
+    each Block subclass in turn and using the first that successfully loads the block.
+    """
+    result = {}
+    for field_name, block_name in block_refs.items():
+        field = block_cls.model_fields.get(field_name)
+        if not field:
+            continue
+
+        ann = field.annotation
+        args = get_args(ann)
+        candidates = [a for a in (args if args else (ann,)) if a is not type(None)]
+        block_types = [a for a in candidates if isinstance(a, type) and issubclass(a, Block)]
+
+        if not block_types:
+            continue
+
+        for block_type in block_types:
+            try:
+                result[field_name] = block_type.load(block_name)
+                break
+            except (ValueError, ValidationError):
+                continue
+        else:
+            tried = ", ".join(t.__name__ for t in block_types)
+            raise ValueError(f"Could not load block '{block_name}' for field '{field_name}' (tried: {tried})")
+    return result
+
+
 def _env_settings_for(
     block_cls: type[Block],
     source: EnvBlockSource,
@@ -156,8 +190,8 @@ def _env_settings_for(
     definitions: dict[str, tuple[Any, Any]] = {}
 
     for name, model_field in block_cls.model_fields.items():
-        if name in nested:
-            continue  # handled via dot-notation in _build_from_env
+        if name in nested or name in source.blocks:
+            continue  # handled via dot-notation or block reference
 
         source_name = source.fields.get(name, name)
         source_to_block[source_name] = name
@@ -210,6 +244,7 @@ def _build_from_env(block_name: str, block_cls: type[Block], source: EnvBlockSou
             for top, subs in nested.items()
         },
     )
+    values.update(_load_block_refs(block_cls, source.blocks))
     return block_cls(**values)
 
 
@@ -244,7 +279,7 @@ def _build_from_keeper(block_name: str, block_cls: type[Block], source: KeeperBl
 
     values: dict[str, Any] = {}
     for field_name in block_cls.model_fields:
-        if field_name not in nested:
+        if field_name not in nested and field_name not in source.blocks:
             if (v := _keeper_field_value(record, source.fields.get(field_name, field_name))) is not None:
                 values[field_name] = v
 
@@ -256,6 +291,7 @@ def _build_from_keeper(block_name: str, block_cls: type[Block], source: KeeperBl
             for top, subs in nested.items()
         },
     )
+    values.update(_load_block_refs(block_cls, source.blocks))
 
     try:
         return block_cls(**values)

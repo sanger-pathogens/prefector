@@ -522,3 +522,109 @@ def test_build_from_env_source_dot_notation_absent_env_var_uses_default(monkeypa
 
     assert block.name == "my-creds"
     assert block.params.endpoint_url is None
+
+
+class _DepBlock(Block):
+    token: str
+
+
+class _ParentBlock(Block):
+    dep: _DepBlock
+    label: str = ""
+
+
+def _mock_block_load(block_cls, block_name, return_value):
+    """Patch block_cls.load to return return_value."""
+    return patch.object(block_cls, "load", return_value=return_value)
+
+
+def test_load_block_sources_parses_blocks_field(tmp_path):
+    (tmp_path / "block-sources.yaml").write_text(
+        "my-block:\n  source: env\n  env_var_prefix: X_\n  blocks:\n    dep: my-dep-block\n",
+        encoding="utf-8",
+    )
+    config = load_block_sources(tmp_path / "block-sources.yaml")
+    assert config.root["my-block"].blocks == {"dep": "my-dep-block"}
+
+
+def test_build_from_env_source_loads_block_ref(monkeypatch):
+    """The 'blocks' section loads a named Prefect block into a Block-typed field."""
+    monkeypatch.setenv("X_LABEL", "hello")
+    dep = _DepBlock(token="tok123")
+
+    source = EnvBlockSource(source="env", env_var_prefix="X_", blocks={"dep": "my-dep"})
+    with _mock_block_load(_DepBlock, "my-dep", dep):
+        block = build_block_from_source("parent", _ParentBlock, source)
+
+    assert block.label == "hello"
+    assert block.dep.token == "tok123"
+
+
+def test_build_from_env_source_block_ref_excluded_from_env_settings(monkeypatch):
+    """A field listed in 'blocks' is not read from env vars even if an env var is set."""
+    monkeypatch.setenv("X_LABEL", "hello")
+    monkeypatch.setenv("X_DEP__TOKEN", "from-env")  # should be ignored
+    dep = _DepBlock(token="tok-from-block")
+
+    source = EnvBlockSource(source="env", env_var_prefix="X_", blocks={"dep": "my-dep"})
+    with _mock_block_load(_DepBlock, "my-dep", dep):
+        block = build_block_from_source("parent", _ParentBlock, source)
+
+    assert block.dep.token == "tok-from-block"
+
+
+def test_build_from_keeper_source_loads_block_ref():
+    """The 'blocks' section works with Keeper source too."""
+    dep = _DepBlock(token="tok-keeper")
+    source = KeeperBlockSource(
+        source="keeper",
+        record_title="parent-creds",
+        fields={"label": "lbl"},
+        blocks={"dep": "my-dep"},
+    )
+    record = _make_keeper_record(custom={"lbl": "from-keeper"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    with _keeper_patch(mock_sm), _mock_block_load(_DepBlock, "my-dep", dep):
+        block = build_block_from_source("parent", _ParentBlock, source)
+
+    assert block.label == "from-keeper"
+    assert block.dep.token == "tok-keeper"
+
+
+class _AltDepBlock(Block):
+    token: str
+
+
+class _UnionParentBlock(Block):
+    dep: _DepBlock | _AltDepBlock
+    label: str = ""
+
+
+def test_build_from_env_source_loads_block_ref_union_annotation(monkeypatch):
+    """When a field is Union[BlockA, BlockB], the first type that loads successfully is used."""
+    monkeypatch.setenv("X_LABEL", "hi")
+    dep = _AltDepBlock(token="alt-tok")
+
+    source = EnvBlockSource(source="env", env_var_prefix="X_", blocks={"dep": "my-dep"})
+    with (
+        patch.object(_DepBlock, "load", side_effect=ValueError("not found")),
+        patch.object(_AltDepBlock, "load", return_value=dep),
+    ):
+        block = build_block_from_source("parent", _UnionParentBlock, source)
+
+    assert block.dep.token == "alt-tok"
+
+
+def test_build_from_env_source_block_ref_union_raises_when_all_types_fail(monkeypatch):
+    """Raises ValueError when no Block subclass in the Union can load the named block."""
+    monkeypatch.setenv("X_LABEL", "hi")
+
+    source = EnvBlockSource(source="env", env_var_prefix="X_", blocks={"dep": "missing-block"})
+    with (
+        patch.object(_DepBlock, "load", side_effect=ValueError("not found")),
+        patch.object(_AltDepBlock, "load", side_effect=ValueError("not found")),
+    ):
+        with pytest.raises(ValueError, match="Could not load block 'missing-block'"):
+            build_block_from_source("parent", _UnionParentBlock, source)
