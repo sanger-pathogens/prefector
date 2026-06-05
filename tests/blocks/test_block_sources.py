@@ -1,12 +1,16 @@
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 import pytest
 from prefect.blocks.core import Block
+from pydantic import BaseModel, Field
 
 from prefector.blocks.sources import (
     EnvBlockSource,
     KeeperBlockSource,
     _keeper_record_title,
+    _parse_nested_mappings,
+    _unwrap_model_cls,
     build_block_from_source,
     load_block_sources,
 )
@@ -356,3 +360,165 @@ def test_resolve_sources_returns_none_when_absent(tmp_path):
 
     assert config is None
     assert path is None
+
+
+def test_parse_nested_mappings_extracts_dotted_entries():
+    fields = {
+        "username": "login",
+        "params.endpoint_url": "hostname",
+        "params.use_ssl": "ssl_enabled",
+    }
+    result = _parse_nested_mappings(fields)
+    assert result == {"params": {"endpoint_url": "hostname", "use_ssl": "ssl_enabled"}}
+
+
+def test_parse_nested_mappings_ignores_flat_entries():
+    assert _parse_nested_mappings({"username": "login"}) == {}
+
+
+def test_parse_nested_mappings_empty():
+    assert _parse_nested_mappings({}) == {}
+
+
+class _Params(BaseModel):
+    endpoint_url: str | None = None
+
+
+class _NestedBlock(Block):
+    params: _Params = Field(default_factory=_Params)
+    name: str = ""
+
+
+def test_unwrap_model_cls_returns_class_for_basemodel():
+    assert _unwrap_model_cls(_Params) is _Params
+
+
+def test_unwrap_model_cls_unwraps_optional():
+
+    assert _unwrap_model_cls(Optional[_Params]) is _Params
+
+
+def test_unwrap_model_cls_returns_none_for_primitive():
+    assert _unwrap_model_cls(str) is None
+    assert _unwrap_model_cls(int) is None
+
+
+def test_unwrap_model_cls_returns_none_for_block_subclass():
+    assert _unwrap_model_cls(_NestedBlock) is None
+
+
+def _keeper_patch(mock_sm):
+    return patch.dict(
+        "sys.modules",
+        {
+            "keeper_secrets_manager_core": MagicMock(SecretsManager=MagicMock(return_value=mock_sm)),
+            "keeper_secrets_manager_core.storage": MagicMock(InMemoryKeyValueStorage=MagicMock()),
+        },
+    )
+
+
+def test_build_from_keeper_maps_dot_notation_to_nested_model():
+    """A 'top.sub: keeper_field' mapping populates a nested BaseModel sub-field."""
+    source = KeeperBlockSource(
+        source="keeper",
+        record_title="aws-credentials",
+        fields={
+            "name": "record_name",
+            "params.endpoint_url": "hostname",
+        },
+    )
+    record = _make_keeper_record(custom={"record_name": "my-creds", "hostname": "https://minio.example.com"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    with _keeper_patch(mock_sm):
+        block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.name == "my-creds"
+    assert block.params.endpoint_url == "https://minio.example.com"
+
+
+def test_build_from_keeper_nested_field_absent_in_keeper_uses_default():
+    """When the mapped Keeper field is absent, the nested model uses its own defaults."""
+    source = KeeperBlockSource(
+        source="keeper",
+        record_title="aws-credentials",
+        fields={
+            "name": "record_name",
+            "params.endpoint_url": "hostname",  # hostname is not in the record
+        },
+    )
+    record = _make_keeper_record(custom={"record_name": "my-creds"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    with _keeper_patch(mock_sm):
+        block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.name == "my-creds"
+    assert block.params.endpoint_url is None  # default from _Params
+
+
+def test_build_from_keeper_dot_notation_field_not_recognised_in_flat_pass():
+    """A dot-notation entry is not treated as a flat field name during flat extraction."""
+    source = KeeperBlockSource(
+        source="keeper",
+        record_title="aws-credentials",
+        fields={
+            "params.endpoint_url": "hostname",
+        },
+    )
+    # Record only has hostname, no flat "params" field
+    record = _make_keeper_record(custom={"hostname": "https://minio.example.com"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    with _keeper_patch(mock_sm):
+        block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.params.endpoint_url == "https://minio.example.com"
+    assert block.name == ""  # default from Block (empty string would fail — it's str, no default)
+
+
+def test_build_from_env_source_reads_nested_model_field(monkeypatch):
+    """With env_nested_delimiter, sub-fields of a nested BaseModel are read from env vars."""
+    monkeypatch.setenv("CREDS_PARAMS__ENDPOINT_URL", "https://minio.example.com")
+    monkeypatch.setenv("CREDS_NAME", "my-creds")
+
+    source = EnvBlockSource(source="env", env_var_prefix="CREDS_")
+    block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.name == "my-creds"
+    assert block.params.endpoint_url == "https://minio.example.com"
+
+
+def test_build_from_env_source_dot_notation_maps_renamed_env_var(monkeypatch):
+    """A 'top.sub: ENV_SUFFIX' mapping reads PREFIX+ENV_SUFFIX instead of the default nested name."""
+    monkeypatch.setenv("CREDS_ENDPOINT_URL", "https://minio.example.com")
+    monkeypatch.setenv("CREDS_NAME", "my-creds")
+
+    source = EnvBlockSource(
+        source="env",
+        env_var_prefix="CREDS_",
+        fields={"params.endpoint_url": "ENDPOINT_URL"},
+    )
+    block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.name == "my-creds"
+    assert block.params.endpoint_url == "https://minio.example.com"
+
+
+def test_build_from_env_source_dot_notation_absent_env_var_uses_default(monkeypatch):
+    """When the mapped env var is absent, the nested field keeps its model default."""
+    monkeypatch.delenv("CREDS_ENDPOINT_URL", raising=False)
+    monkeypatch.setenv("CREDS_NAME", "my-creds")
+
+    source = EnvBlockSource(
+        source="env",
+        env_var_prefix="CREDS_",
+        fields={"params.endpoint_url": "ENDPOINT_URL"},
+    )
+    block = build_block_from_source("aws-credentials", _NestedBlock, source)
+
+    assert block.name == "my-creds"
+    assert block.params.endpoint_url is None
