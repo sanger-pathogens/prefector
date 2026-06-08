@@ -1,7 +1,7 @@
 import os
 import re
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Literal, get_args
 
 import yaml
 from prefect.blocks.core import Block
@@ -17,6 +17,7 @@ class EnvBlockSource(BaseModel):
     source: Literal["env"]
     env_var_prefix: str = ""
     fields: dict[str, str] = Field(default_factory=dict)  # block_field -> env_var_suffix
+    blocks: dict[str, str] = Field(default_factory=dict)  # block_field -> deployed block name
 
 
 class KeeperBlockSource(BaseModel):
@@ -29,6 +30,7 @@ class KeeperBlockSource(BaseModel):
     separator: str = ":"
     ksm_token: str = ""
     fields: dict[str, str] = Field(default_factory=dict)  # block_field -> KSM field title
+    blocks: dict[str, str] = Field(default_factory=dict)  # block_field -> deployed block name
 
 
 BlockSource = Annotated[EnvBlockSource | KeeperBlockSource, Field(discriminator="source")]
@@ -112,12 +114,85 @@ def load_block_sources(path: Path) -> BlockSourcesConfig:
         raise ValueError(f"Invalid block sources config in {path}:\n{exc}") from exc
 
 
-def _env_settings_for(block_cls: type[Block], source: EnvBlockSource) -> tuple[type[BaseSettings], dict[str, str]]:
+def _unwrap_model_cls(annotation: Any) -> type | None:
+    """Return the concrete BaseModel subclass from annotation, unwrapping Optional[X] if needed.
+
+    Returns None for primitives, Union types with multiple non-None args, and Block subclasses
+    (which are handled via BlockSpec dependencies, not nested field extraction).
+    """
+    args = get_args(annotation)
+    if args:
+        non_none = [a for a in args if a is not type(None)]
+        if len(non_none) != 1:
+            return None
+        annotation = non_none[0]
+    try:
+        if isinstance(annotation, type) and issubclass(annotation, BaseModel) and not issubclass(annotation, Block):
+            return annotation
+    except TypeError:
+        pass
+    return None
+
+
+def _parse_nested_mappings(source_fields: dict[str, str]) -> dict[str, dict[str, str]]:
+    """Split dot-notation entries out of a fields mapping.
+
+    Returns {top_field: {sub_field: source_name}} for every key that contains a dot.
+    Flat entries (no dot) are left in the original dict and ignored here.
+    """
+    nested: dict[str, dict[str, str]] = {}
+    for block_path, source_name in source_fields.items():
+        if "." in block_path:
+            top, sub = block_path.split(".", 1)
+            nested.setdefault(top, {})[sub] = source_name
+    return nested
+
+
+def _load_block_refs(block_cls: type[Block], block_refs: dict[str, str]) -> dict[str, Any]:
+    """Load named Prefect blocks for fields declared in the 'blocks' config section.
+
+    Handles Union-typed fields (e.g. Union[MinIOCredentials, AwsCredentials]) by trying
+    each Block subclass in turn and using the first that successfully loads the block.
+    """
+    result = {}
+    for field_name, block_name in block_refs.items():
+        field = block_cls.model_fields.get(field_name)
+        if not field:
+            continue
+
+        ann = field.annotation
+        args = get_args(ann)
+        candidates = [a for a in (args if args else (ann,)) if a is not type(None)]
+        block_types = [a for a in candidates if isinstance(a, type) and issubclass(a, Block)]
+
+        if not block_types:
+            continue
+
+        for block_type in block_types:
+            try:
+                result[field_name] = block_type.load(block_name)
+                break
+            except (ValueError, ValidationError):
+                continue
+        else:
+            tried = ", ".join(t.__name__ for t in block_types)
+            raise ValueError(f"Could not load block '{block_name}' for field '{field_name}' (tried: {tried})")
+    return result
+
+
+def _env_settings_for(
+    block_cls: type[Block],
+    source: EnvBlockSource,
+    nested: dict[str, dict[str, str]],
+) -> tuple[type[BaseSettings], dict[str, str]]:
     """Build a settings class keyed by source field names plus a source->block field mapping."""
     source_to_block: dict[str, str] = {}
     definitions: dict[str, tuple[Any, Any]] = {}
 
     for name, model_field in block_cls.model_fields.items():
+        if name in nested or name in source.blocks:
+            continue  # handled via dot-notation or block reference
+
         source_name = source.fields.get(name, name)
         source_to_block[source_name] = name
 
@@ -143,13 +218,33 @@ def _env_settings_for(block_cls: type[Block], source: EnvBlockSource) -> tuple[t
     return settings_cls, source_to_block
 
 
+def _apply_nested(values: dict[str, Any], block_cls: type[Block], nested_kwargs: dict[str, dict[str, Any]]) -> None:
+    """Instantiate nested-model fields from pre-resolved sub-field kwargs and add to values."""
+    for top, kwargs in nested_kwargs.items():
+        field = block_cls.model_fields.get(top)
+        if field and (cls := _unwrap_model_cls(field.annotation)) and kwargs:
+            values[top] = cls(**kwargs)
+
+
 def _build_from_env(block_name: str, block_cls: type[Block], source: EnvBlockSource) -> Block:
-    settings_cls, source_to_block = _env_settings_for(block_cls, source)
+    nested = _parse_nested_mappings(source.fields)
+    settings_cls, source_to_block = _env_settings_for(block_cls, source, nested)
     try:
         settings = settings_cls()
     except ValidationError as exc:
         raise BlockBuildError(block_name, settings_cls, exc) from exc
     values = {block_field: getattr(settings, src_field) for src_field, block_field in source_to_block.items()}
+
+    prefix = source.env_var_prefix
+    _apply_nested(
+        values,
+        block_cls,
+        {
+            top: {sub: v for sub, src in subs.items() if (v := os.environ.get(f"{prefix}{src.upper()}")) is not None}
+            for top, subs in nested.items()
+        },
+    )
+    values.update(_load_block_refs(block_cls, source.blocks))
     return block_cls(**values)
 
 
@@ -180,12 +275,23 @@ def _build_from_keeper(block_name: str, block_cls: type[Block], source: KeeperBl
     if record is None:
         raise ValueError(f"No Keeper record found with title '{record_title}' for block '{block_name}'")
 
+    nested = _parse_nested_mappings(source.fields)
+
     values: dict[str, Any] = {}
     for field_name in block_cls.model_fields:
-        source_name = source.fields.get(field_name, field_name)
-        value = _keeper_field_value(record, source_name)
-        if value is not None:
-            values[field_name] = value
+        if field_name not in nested and field_name not in source.blocks:
+            if (v := _keeper_field_value(record, source.fields.get(field_name, field_name))) is not None:
+                values[field_name] = v
+
+    _apply_nested(
+        values,
+        block_cls,
+        {
+            top: {sub: v for sub, src in subs.items() if (v := _keeper_field_value(record, src)) is not None}
+            for top, subs in nested.items()
+        },
+    )
+    values.update(_load_block_refs(block_cls, source.blocks))
 
     try:
         return block_cls(**values)

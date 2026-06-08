@@ -116,6 +116,17 @@ blocks:
       env_var_prefix: TRINO_
 ```
 
+### Block Properties
+Each block must define a source and the required fields for that source. Additionally, there are other keys that can be used:
+
+`blocks` is used when Prefect allows two blocks to be linked (e.g. S3 bucket and AWS Credentials)
+Provide a list of YAML mappings for block names and the field to be populated with that block's values.
+In the below case, the `credentials` field will be populated with the values from the `aws-credentials` block.
+```yaml
+blocks:
+  credentials: aws-credentials
+```
+The named block will be loaded from Prefect so must have already been deployed before this block.
 ### Environment variable source
 
 Reads block field values from environment variables.
