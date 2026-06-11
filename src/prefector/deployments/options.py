@@ -9,6 +9,7 @@ from click_option_group import optgroup
 @dataclass
 class DeploymentOptions:
     deployments_dir: Path
+    skip_import_validation: bool
 
 
 @dataclass
@@ -20,7 +21,6 @@ class DeploymentDeployOptions:
     image_prefix: str
     image_tag: str
     dry_run: bool
-    skip_import_validation: bool
 
 
 _OPTION_KEYS = {f.name for f in DeploymentOptions.__dataclass_fields__.values()}
@@ -34,6 +34,12 @@ def deployment_options(f):
         type=click.Path(exists=True, file_okay=False, path_type=Path),
         default=".",
         help="Directory containing deployment YAML.",
+    )
+    @optgroup.option(
+        "--skip-import-validation",
+        help="Skip the check that flow modules are importable.",
+        is_flag=True,
+        default=False,
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -57,12 +63,6 @@ def deployment_deploy_options(f):
     @optgroup.option("--image-tag", help="Image tag for deployment.", default="latest", show_default=True)
     @optgroup.option(
         "--dry-run", help="Print only the proposed actions without executing.", is_flag=True, default=False
-    )
-    @optgroup.option(
-        "--skip-import-validation",
-        help="Skip the check that flow modules are importable.",
-        is_flag=True,
-        default=False,
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):

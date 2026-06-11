@@ -27,5 +27,8 @@ def print_deployments(deployments: Iterable[DeploymentSpec]) -> None:
 def list_deployments(deployment_opts: DeploymentOptions):
     """List Prefect deployments"""
     with handle_errors():
-        deployments = load_deployments(deployment_opts.deployments_dir)
+        deployments = load_deployments(
+            deployment_opts.deployments_dir,
+            skip_import_validation=deployment_opts.skip_import_validation,
+        )
         print_deployments(deployments)
