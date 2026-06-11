@@ -134,7 +134,10 @@ def deploy(
     deployment_deploy_opts: DeploymentDeployOptions,
 ):
     """Deploy Prefect deployments"""
-    deployments = load_deployments(deployment_opts.deployments_dir)
+    deployments = load_deployments(
+        deployment_opts.deployments_dir,
+        skip_import_validation=deployment_deploy_opts.skip_import_validation,
+    )
     images = load_image_manifest(deployment_deploy_opts.images_manifest)
     prefect_settings = generate_prefect_settings(connection)
     targets = _select_targets(deployment_deploy_opts.target, deployments)

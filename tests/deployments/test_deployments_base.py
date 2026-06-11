@@ -38,19 +38,41 @@ def test_deployment_spec_requires_flow_separator(deployment_spec_dict):
         DeploymentSpec(**deployment_spec_dict)
 
 
-def test_deployment_spec_requires_existing_flow_module(deployment_spec_dict):
+def test_deployment_spec_requires_existing_flow_module(tmp_path, deployment_spec_dict):
     deployment_spec_dict["flow"] = "not.a.real.module:run"
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.dump(deployment_spec_dict), encoding="utf-8")
 
     with pytest.raises(ValueError, match="flow module file does not exist"):
-        DeploymentSpec(**deployment_spec_dict)
+        DeploymentSpec.from_yaml(path)
 
 
-def test_deployment_spec_requires_existing_flow_function(deployment_spec_dict):
+def test_deployment_spec_requires_existing_flow_function(tmp_path, deployment_spec_dict):
     module, _ = deployment_spec_dict["flow"].split(":", maxsplit=1)
     deployment_spec_dict["flow"] = f"{module}:not_present"
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.dump(deployment_spec_dict), encoding="utf-8")
 
     with pytest.raises(ValueError, match="flow function does not exist"):
-        DeploymentSpec(**deployment_spec_dict)
+        DeploymentSpec.from_yaml(path)
+
+
+def test_from_yaml_skip_import_validation(tmp_path, deployment_spec_dict):
+    deployment_spec_dict["flow"] = "not.a.real.module:run"
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.dump(deployment_spec_dict), encoding="utf-8")
+
+    spec = DeploymentSpec.from_yaml(path, skip_import_validation=True)
+    assert spec.flow == "not.a.real.module:run"
+
+
+def test_load_deployments_skip_import_validation(tmp_path, deployment_spec_dict):
+    deployment_spec_dict["flow"] = "not.a.real.module:run"
+    path = tmp_path / "spec.yaml"
+    path.write_text(yaml.dump(deployment_spec_dict), encoding="utf-8")
+
+    specs = load_deployments(tmp_path, skip_import_validation=True)
+    assert specs[0].flow == "not.a.real.module:run"
 
 
 def test_from_yaml_rejects_empty_file(tmp_path: Path):

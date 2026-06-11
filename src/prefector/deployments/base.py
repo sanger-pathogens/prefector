@@ -94,23 +94,6 @@ class DeploymentSpec(BaseModel):
             raise ValueError("flow must use '<module>:<function>' format")
         return value
 
-    @model_validator(mode="after")
-    def _validate_flow_importable(self) -> "DeploymentSpec":
-        module, _, function = self.flow.partition(":")
-        try:
-            spec = importlib.util.find_spec(module)
-        except ModuleNotFoundError:
-            spec = None
-        if spec is None or spec.origin is None or not Path(spec.origin).is_file():
-            raise ValueError(f"flow module file does not exist: {module}")
-        try:
-            module_obj = importlib.import_module(module)
-        except Exception as exc:
-            raise ValueError(f"flow module could not be imported: {module}") from exc
-        if not hasattr(module_obj, function):
-            raise ValueError(f"flow function does not exist: {module}:{function}")
-        return self
-
     @property
     def module(self) -> str:
         return self.flow.split(":", maxsplit=1)[0]
@@ -120,24 +103,46 @@ class DeploymentSpec(BaseModel):
         return self.flow.split(":", maxsplit=1)[1]
 
     @classmethod
-    def from_yaml(cls, path: Path) -> "DeploymentSpec":
+    def from_yaml(cls, path: Path, *, skip_import_validation: bool = False) -> "DeploymentSpec":
         payload = yaml.safe_load(path.read_text(encoding="utf-8"))
         if payload is None:
             raise ValueError(f"Empty YAML file: {path}")
         if not isinstance(payload, dict):
             raise ValueError(f"Expected mapping in {path}, got {type(payload).__name__}")
         try:
-            return cls.model_validate(payload)
+            spec = cls.model_validate(payload)
         except ValidationError as exc:
             raise ValueError(f"Invalid deployment config in {path}:\n{exc}") from exc
+        if not skip_import_validation:
+            try:
+                _check_flow_importable(spec)
+            except ValueError as exc:
+                raise ValueError(f"Invalid deployment config in {path}:\n{exc}") from exc
+        return spec
 
 
-def load_deployments(config_dir: Path) -> list[DeploymentSpec]:
+def _check_flow_importable(spec: "DeploymentSpec") -> None:
+    module, _, function = spec.flow.partition(":")
+    try:
+        found = importlib.util.find_spec(module)
+    except ModuleNotFoundError:
+        found = None
+    if found is None or found.origin is None or not Path(found.origin).is_file():
+        raise ValueError(f"flow module file does not exist: {module}")
+    try:
+        module_obj = importlib.import_module(module)
+    except Exception as exc:
+        raise ValueError(f"flow module could not be imported: {module}") from exc
+    if not hasattr(module_obj, function):
+        raise ValueError(f"flow function does not exist: {module}:{function}")
+
+
+def load_deployments(config_dir: Path, *, skip_import_validation: bool = False) -> list[DeploymentSpec]:
     specs = []
 
     config_paths = itertools.chain(config_dir.glob("*.yaml"), config_dir.glob("*.yml"))
     for path in config_paths:
-        spec = DeploymentSpec.from_yaml(path)
+        spec = DeploymentSpec.from_yaml(path, skip_import_validation=skip_import_validation)
         specs.append(spec)
 
     name_counts = Counter(spec.name for spec in specs)
