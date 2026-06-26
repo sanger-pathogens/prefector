@@ -63,7 +63,11 @@ def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_ce
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
 
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as e:
+        raise RuntimeError(f"Keycloak token request failed: {response.text}") from e
+
     data = response.json()
 
     token = data.get("access_token")
