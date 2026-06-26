@@ -154,7 +154,7 @@ def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_connecti
     assert captured["form_data"]["client_id"] == "prefect-cli"
     assert captured["form_data"]["username"] == "alice"
     assert captured["form_data"]["password"] == "secret"
-    assert captured["form_data"]["scope"] == "openid profile email groups"
+    assert captured["form_data"]["scope"] == "openid profile email"
     assert captured["ssl_cert"] is None
     assert json.loads(settings[PREFECT_CLIENT_CUSTOM_HEADERS]) == {"Authorization": "Bearer op-token"}
     assert PREFECT_API_AUTH_STRING not in settings
