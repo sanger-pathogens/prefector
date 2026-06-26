@@ -71,6 +71,12 @@ def test_cli_deployments_list_succeeds(runner, monkeypatch, tmp_path):
     assert result.exit_code == 0
 
 
+def test_cli_debug_is_flag(runner):
+    result = runner.invoke(cli, ["--debug", "--help"])
+    assert result.exit_code == 0
+    assert "Usage:" in result.output
+
+
 def test_cli_help_lists_subcommands(runner):
     result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
