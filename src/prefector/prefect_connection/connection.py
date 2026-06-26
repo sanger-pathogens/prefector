@@ -33,7 +33,7 @@ def detect_auth_mode(args: PrefectConnectionArgs) -> Optional[str]:
 def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str, str]:
     if mode == "password":
         if not args.keycloak_username or not args.keycloak_password:
-            raise ValueError("Both --keycloak-username and --keycloak-password are required together.")
+            raise click.UsageError("Both --keycloak-username and --keycloak-password are required together.")
         return {
             "grant_type": "password",
             "client_id": args.keycloak_direct_grant_client_id,
@@ -44,14 +44,14 @@ def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str
 
     if mode == "client":
         if not args.keycloak_client_id or not args.keycloak_client_secret:
-            raise ValueError("Both --keycloak-client-id and --keycloak-client-secret are required together.")
+            raise click.UsageError("Both --keycloak-client-id and --keycloak-client-secret are required together.")
         return {
             "grant_type": "client_credentials",
             "client_id": args.keycloak_client_id,
             "client_secret": args.keycloak_client_secret,
         }
 
-    raise ValueError(f"Unknown auth mode: {mode}")
+    raise click.UsageError(f"Unknown auth mode: {mode}")
 
 
 def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_cert: Path = None) -> str:

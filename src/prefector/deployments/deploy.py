@@ -134,12 +134,12 @@ def deploy(
     deployment_deploy_opts: DeploymentDeployOptions,
 ):
     """Deploy Prefect deployments"""
-    deployments = load_deployments(deployment_opts.deployments_dir)
-    images = load_image_manifest(deployment_deploy_opts.images_manifest)
-    prefect_settings = generate_prefect_settings(connection)
-    targets = _select_targets(deployment_deploy_opts.target, deployments)
-
     with handle_errors():
+        deployments = load_deployments(deployment_opts.deployments_dir)
+        images = load_image_manifest(deployment_deploy_opts.images_manifest)
+        prefect_settings = generate_prefect_settings(connection)
+        targets = _select_targets(deployment_deploy_opts.target, deployments)
+
         with temporary_settings(updates=prefect_settings):
             for index, target in enumerate(targets):
                 deploy_target(

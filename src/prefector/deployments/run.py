@@ -82,9 +82,9 @@ def run_flow(connection: PrefectConnectionArgs, deployment_name: str | None, tag
     if deployment_name and tags:
         raise click.UsageError("Provide a deployment name or --tag, not both.")
 
-    prefect_settings = generate_prefect_settings(connection)
-
     with handle_errors():
+        prefect_settings = generate_prefect_settings(connection)
+
         with temporary_settings(updates=prefect_settings):
             if deployment_name:
                 deployments = _prefect(lambda c: _find_deployments(c, deployment_name))
