@@ -77,7 +77,7 @@ def test_exchange_keycloak_token_returns_access_token(mock_post_response):
 def test_exchange_keycloak_token_raises_on_http_error(mock_post_response):
     mock_post_response(status_code=401, text='{"error":"unauthorized"}')
 
-    with pytest.raises(requests.HTTPError, match="HTTP 401"):
+    with pytest.raises(RuntimeError, match="Keycloak token request failed"):
         pc.exchange_keycloak_token(token_url="https://keycloak/token", form_data={})
 
 
@@ -154,7 +154,7 @@ def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_connecti
     assert captured["form_data"]["client_id"] == "prefect-cli"
     assert captured["form_data"]["username"] == "alice"
     assert captured["form_data"]["password"] == "secret"
-    assert captured["form_data"]["scope"] == "openid profile email groups"
+    assert captured["form_data"]["scope"] == "openid profile email"
     assert captured["ssl_cert"] is None
     assert json.loads(settings[PREFECT_CLIENT_CUSTOM_HEADERS]) == {"Authorization": "Bearer op-token"}
     assert PREFECT_API_AUTH_STRING not in settings
@@ -210,7 +210,7 @@ def test_generate_prefect_settings_rejects_multiple_auth_modes(build_connection)
     ],
 )
 def test_generate_prefect_settings_rejects_incomplete_credential_pairs(override, build_connection):
-    with pytest.raises(ValueError, match="required together"):
+    with pytest.raises(click.UsageError, match="required together"):
         pc.generate_prefect_settings(build_connection(keycloak_token_url="https://keycloak/token", **override))
 
 

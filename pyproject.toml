@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "prefector"
-version = "0.3.0"
+version = "0.3.1"
 description = "Reusable Prefect block and deployment CLI."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
@@ -35,7 +35,11 @@ dev = [
   "pytest~=9.0.2",
   "pytest-cov~=7.1.0",
   "ruff~=0.15.8",
+  "pre-commit>=4,<5",
 ]
+
+[tool.poetry.group.dev]
+optional = true
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/prefector"]
