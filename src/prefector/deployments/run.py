@@ -13,7 +13,7 @@ from prefector.errors import handle_errors
 from prefector.prefect_connection.connection import generate_prefect_settings
 from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
-CONSOLE = Console()
+CONSOLE = Console(soft_wrap=True)
 
 
 def _prefect(coro_fn):
