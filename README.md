@@ -210,7 +210,14 @@ parameters:
 env:
   ENVIRONMENT: ${ENVIRONMENT}        # resolved from the environment at deploy time
   LOG_LEVEL: INFO
+concurrency_limit: 1                # max concurrent flow runs for this deployment
+collision_strategy: CANCEL_NEW      # ENQUEUE (default) or CANCEL_NEW
 ```
+
+`collision_strategy` requires `concurrency_limit` to be set, and controls what
+happens to a new run submitted while the limit is already reached: `ENQUEUE`
+(default) waits for a free slot, `CANCEL_NEW` cancels the incoming run
+immediately.
 
 ### Environment variable substitution
 

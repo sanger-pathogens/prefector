@@ -53,6 +53,35 @@ def test_deployment_spec_requires_existing_flow_function(deployment_spec_dict):
         DeploymentSpec(**deployment_spec_dict)
 
 
+def test_deployment_spec_accepts_concurrency_options(deployment_spec_dict):
+    spec = DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 1, "collision_strategy": "CANCEL_NEW"}))
+
+    assert spec.concurrency_limit == 1
+    assert spec.collision_strategy == "CANCEL_NEW"
+
+
+def test_deployment_spec_concurrency_limit_defaults_to_none(deployment_spec_dict):
+    spec = DeploymentSpec(**deployment_spec_dict)
+
+    assert spec.concurrency_limit is None
+    assert spec.collision_strategy is None
+
+
+def test_deployment_spec_rejects_non_positive_concurrency_limit(deployment_spec_dict):
+    with pytest.raises(ValueError, match="greater than 0"):
+        DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 0}))
+
+
+def test_deployment_spec_rejects_invalid_collision_strategy(deployment_spec_dict):
+    with pytest.raises(ValueError):
+        DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 1, "collision_strategy": "REJECT"}))
+
+
+def test_deployment_spec_rejects_collision_strategy_without_concurrency_limit(deployment_spec_dict):
+    with pytest.raises(ValueError, match="collision_strategy requires concurrency_limit"):
+        DeploymentSpec(**(deployment_spec_dict | {"collision_strategy": "CANCEL_NEW"}))
+
+
 def test_from_yaml_rejects_empty_file(tmp_path: Path):
     path = tmp_path / "empty.yaml"
     path.write_text("", encoding="utf-8")

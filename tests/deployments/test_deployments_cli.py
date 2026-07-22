@@ -108,6 +108,43 @@ def test_deploy_target(monkeypatch, prefect_test_fixture, deployment_spec_dict, 
     assert created.entrypoint == spec.flow.replace(":", ".")
 
 
+def test_deploy_target_applies_concurrency_options(
+    monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir
+):
+    pool_name = "test-pool-concurrency"
+
+    with get_client(sync_client=True) as client:
+        client.create_work_pool(
+            WorkPoolCreate(
+                name=pool_name,
+                base_job_template={
+                    "job_configuration": {"image": "{{ image }}"},
+                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
+                },
+            ),
+            overwrite=True,
+        )
+
+    spec = DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 1, "collision_strategy": "CANCEL_NEW"}))
+
+    monkeypatch.chdir(deployment_flow_dir)
+
+    deploy_cmd.deploy_target(
+        spec=spec,
+        work_pool_name=pool_name,
+        work_queue_name=None,
+        image="test-registry/icddrb-redcap:test",
+        dry_run=False,
+    )
+
+    with get_client(sync_client=True) as client:
+        deployments = client.read_deployments()
+
+    created = deployments[0]
+    assert created.global_concurrency_limit.limit == 1
+    assert created.concurrency_options.collision_strategy == "CANCEL_NEW"
+
+
 def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
     spec = DeploymentSpec(**(deployment_spec_dict | {"parameters": {"retries": "three"}}))
 
