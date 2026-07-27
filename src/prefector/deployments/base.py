@@ -4,7 +4,7 @@ import os
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 import yaml
 from pydantic import (
@@ -82,6 +82,8 @@ class DeploymentSpec(BaseModel):
     tags: list[str] = Field(default_factory=list)
     parameters: dict[str, Any] = Field(default_factory=dict)
     env: dict[str, Any] = Field(default_factory=dict)
+    concurrency_limit: Annotated[int, Field(gt=0)] | None = None
+    collision_strategy: Literal["ENQUEUE", "CANCEL_NEW"] | None = None
 
     def __str__(self) -> str:
         return f"{self.name}\n  flow: {self.flow}\n  image_key: {self.image_key}"
@@ -109,6 +111,12 @@ class DeploymentSpec(BaseModel):
             raise ValueError(f"flow module could not be imported: {module}") from exc
         if not hasattr(module_obj, function):
             raise ValueError(f"flow function does not exist: {module}:{function}")
+        return self
+
+    @model_validator(mode="after")
+    def _validate_concurrency_options(self) -> "DeploymentSpec":
+        if self.concurrency_limit is None and self.collision_strategy is not None:
+            raise ValueError("collision_strategy requires concurrency_limit to be set")
         return self
 
     @property

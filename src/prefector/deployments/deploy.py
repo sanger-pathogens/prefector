@@ -6,6 +6,7 @@ from typing import Any, Iterable
 
 import click
 from click import UsageError
+from prefect.client.schemas.objects import ConcurrencyLimitConfig
 from prefect.exceptions import ParameterTypeError
 from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
@@ -112,7 +113,11 @@ def deploy_target(  # noqa: PLR0913
         kwargs["job_variables"]["env"] = _resolve_env_dict(spec.env, spec.name)
     if spec.cron:
         kwargs["cron"] = spec.cron
-
+    if spec.concurrency_limit is not None:
+        concurrency_kwargs: dict[str, Any] = {"limit": spec.concurrency_limit}
+        if spec.collision_strategy:
+            concurrency_kwargs["collision_strategy"] = spec.collision_strategy
+        kwargs["concurrency_limit"] = ConcurrencyLimitConfig(**concurrency_kwargs)
     if dry_run:
         CONSOLE.print("[green][✓][/green] Done (dry run)")
         return
