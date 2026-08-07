@@ -3,7 +3,7 @@ from pydantic import Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings
 
-from prefector.blocks.sources.common import field_definitions_for_block
+from prefector.blocks.sources.common import apply_nested_fields, field_definitions_for_block
 
 
 class _Block(Block):
@@ -72,3 +72,33 @@ def test_generated_model_honours_validation_alias():
     settings = settings_cls(required_field="a", other_name="b")
 
     assert settings.aliased_field == "b"
+
+
+def test_apply_nested_fields_sets_subfield():
+    d = {}
+    apply_nested_fields(d, {"parent.child": "some-key"}, {"some-key": "value"}.get)
+    assert d == {"parent": {"child": "value"}}
+
+
+def test_apply_nested_fields_merges_multiple_subfields_of_same_field():
+    d = {}
+    apply_nested_fields(d, {"parent.a": "key-a", "parent.b": "key-b"}, {"key-a": "1", "key-b": "2"}.get)
+    assert d == {"parent": {"a": "1", "b": "2"}}
+
+
+def test_apply_nested_fields_leaves_other_entries_untouched():
+    d = {"other": "unrelated"}
+    apply_nested_fields(d, {"parent.child": "some-key"}, {"some-key": "value"}.get)
+    assert d == {"other": "unrelated", "parent": {"child": "value"}}
+
+
+def test_apply_nested_fields_skips_missing_values():
+    d = {}
+    apply_nested_fields(d, {"parent.child": "missing-key"}, lambda _key: None)
+    assert d == {}
+
+
+def test_apply_nested_fields_skips_when_field_already_non_dict():
+    d = {"parent": "already-a-plain-value"}
+    apply_nested_fields(d, {"parent.child": "some-key"}, {"some-key": "value"}.get)
+    assert d == {"parent": "already-a-plain-value"}

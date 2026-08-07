@@ -6,7 +6,7 @@ from pydantic import BaseModel, create_model
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from prefector.blocks.sources.common import field_definitions_for_block
+from prefector.blocks.sources.common import apply_nested_fields, field_definitions_for_block
 
 
 def keeper_settings_model_for_block(  # noqa: PLR0913
@@ -19,6 +19,7 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
     ksm_token: str | None = None,
     field_types: dict[str, type[Any]] | None = None,
     field_aliases: dict[str, str] | None = None,
+    nested_fields: dict[str, str] | None = None,
 ) -> type[BaseSettings]:
     """
     Build a BaseSettings model from an existing Pydantic/Block model, sourced from a
@@ -31,6 +32,10 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
     `field_aliases` reads a field from a specific Keeper field/custom name, without
     requiring a Block subclass just to rename a field — useful for third-party blocks
     you don't want to modify.
+
+    `nested_fields` maps a dotted `<field>.<subfield>` path to a Keeper field/custom
+    name, for populating one sub-field of a nested model field (for example, Prefect's
+    `AwsCredentials.aws_client_parameters.endpoint_url`) from a flat Keeper record.
     """
     definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
@@ -52,6 +57,7 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
                 record_suffix=record_suffix,
                 separator=separator,
                 ksm_token=ksm_token,
+                nested_fields=nested_fields,
             ),
         )
 
@@ -109,10 +115,12 @@ class KeeperSettingsSource(PydanticBaseSettingsSource):
         record_suffix: str = "",
         separator: str = ":",
         ksm_token: str | None = None,
+        nested_fields: dict[str, str] | None = None,
     ) -> None:
         super().__init__(settings_cls)
         self._record_title = separator.join(part for part in (record_prefix, record_title, record_suffix) if part)
         self._ksm_token = ksm_token
+        self._nested_fields = nested_fields or {}
 
     @cached_property
     def _record(self) -> Any:
@@ -132,4 +140,6 @@ class KeeperSettingsSource(PydanticBaseSettingsSource):
             field_value = self.prepare_field_value(field_name, field, field_value, value_is_complex)
             if field_value is not None:
                 d[field_key] = field_value
+
+        apply_nested_fields(d, self._nested_fields, lambda key: _keeper_field_value(self._record, key))
         return d

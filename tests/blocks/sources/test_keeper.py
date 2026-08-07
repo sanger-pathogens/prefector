@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from prefect.blocks.core import Block
-from pydantic import Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings
 
 from prefector.blocks.sources.keeper import KeeperSettingsSource, keeper_settings_model_for_block
@@ -181,6 +181,52 @@ def test_keeper_settings_model_for_block_reads_matching_fields():
     assert settings.username == "alice"
     assert settings.password == "secret"
     assert settings.port == 8080  # not in the record — falls back to the block's own default
+
+
+class _ClientParameters(BaseModel):
+    endpoint_url: str | None = None
+    api_version: str | None = None
+
+
+class _AwsCredsBlock(Block):
+    aws_access_key_id: str = Field(validation_alias="access_key")
+    aws_client_parameters: _ClientParameters = Field(default_factory=_ClientParameters)
+
+
+def test_keeper_settings_model_for_block_populates_nested_subfield():
+    record = _make_keeper_record(custom={"access_key": "AKIA...", "hostname": "minio.local:9000"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    settings_cls = keeper_settings_model_for_block(
+        _AwsCredsBlock,
+        record_title="aws-credentials",
+        ksm_token="dummy-token",
+        nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+    )
+    with _mock_keeper_sdk(mock_sm):
+        settings = settings_cls()
+
+    assert settings.aws_access_key_id == "AKIA..."
+    assert settings.aws_client_parameters.endpoint_url == "minio.local:9000"
+    assert settings.aws_client_parameters.api_version is None  # untouched, keeps its own default
+
+
+def test_keeper_settings_model_for_block_nested_subfield_missing_from_record_keeps_default():
+    record = _make_keeper_record(custom={"access_key": "AKIA..."})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    settings_cls = keeper_settings_model_for_block(
+        _AwsCredsBlock,
+        record_title="aws-credentials",
+        ksm_token="dummy-token",
+        nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+    )
+    with _mock_keeper_sdk(mock_sm):
+        settings = settings_cls()
+
+    assert settings.aws_client_parameters.endpoint_url is None
 
 
 def test_keeper_settings_model_for_block_field_aliases_renames_without_block_subclass():

@@ -35,32 +35,23 @@ class BlockBuildError(ValueError):
 
 
 def _loc_to_env_var(settings_cls: type[BaseSettings], loc: tuple[Any, ...]) -> str | None:
-    """Map a Pydantic error location tuple to the corresponding environment variable name."""
-    if not loc:
+    """Map a Pydantic error location tuple to the corresponding environment variable name.
+
+    Only handles top-level fields: nested fields have no single conventional env var name
+    to suggest, since they're resolved via an explicit `nested_fields` mapping rather than
+    a fixed naming convention.
+    """
+    if len(loc) != 1 or not isinstance(loc[0], str):
         return None
 
-    env_prefix = str(settings_cls.model_config.get("env_prefix"))
+    env_prefix = settings_cls.model_config.get("env_prefix")
     if env_prefix is None:
         return None
 
-    env_nested_delimiter = str(settings_cls.model_config.get("env_nested_delimiter"))
-    if env_nested_delimiter is None:
-        return None
-
     head = loc[0]
-    if not isinstance(head, str):
-        return None
-
     field = settings_cls.model_fields.get(head)
-    if field is None:
-        head_name = head.upper()
-    else:
-        alias = field.validation_alias if isinstance(field.validation_alias, str) else head
-        head_name = alias.upper()
-
-    tail_parts = [part.upper() for part in loc[1:] if isinstance(part, str)]
-    suffix = env_nested_delimiter.join([head_name, *tail_parts]) if tail_parts else head_name
-    return f"{env_prefix}{suffix}"
+    alias = field.validation_alias if field is not None and isinstance(field.validation_alias, str) else head
+    return f"{env_prefix}{alias.upper()}"
 
 
 @dataclass(frozen=True)

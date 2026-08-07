@@ -71,7 +71,7 @@ passes the resolved values to the block.
 
 ### Sourcing from the environment
 
-`env_settings_model_for_block(block_cls, *, env_prefix="", env_nested_delimiter="__", field_types=None, field_aliases=None)`
+`env_settings_model_for_block(block_cls, *, env_prefix="", field_types=None, field_aliases=None, nested_fields=None)`
 builds a settings class that reads each field from `<env_prefix><FIELD_NAME>`:
 
 ```python
@@ -93,9 +93,24 @@ settings_cls = env_settings_model_for_block(
 )
 ```
 
+For a field that is itself a nested model — for example Prefect's built-in
+`AwsCredentials.aws_client_parameters.endpoint_url` — map each sub-field to a
+full env var name with `nested_fields`:
+
+```python
+settings_cls = env_settings_model_for_block(
+    AwsCredentials,
+    env_prefix="AWS_",
+    nested_fields={"aws_client_parameters.endpoint_url": "AWS_HOSTNAME"},
+)
+```
+
+Only the mapped sub-fields are set; any sub-field of `aws_client_parameters`
+not listed in `nested_fields` keeps its own default.
+
 ### Sourcing from Keeper Secrets Manager
 
-`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None, field_aliases=None)`
+`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None, field_aliases=None, nested_fields=None)`
 builds a settings class that reads each field from a Keeper record instead:
 
 ```python
@@ -154,6 +169,23 @@ from pydantic import Field
 class TrinoBlock(DatabaseCredentials):
     user: str = Field(validation_alias="login")
 ```
+
+`KeeperSettingsSource` only matches top-level fields by name/alias — it can't
+reach into a nested model's sub-fields on its own. For a sub-field that needs a
+value from this record (for example Prefect's built-in
+`AwsCredentials.aws_client_parameters.endpoint_url`), map it explicitly with
+`nested_fields`:
+
+```python
+settings_cls = keeper_settings_model_for_block(
+    AwsCredentials,
+    record_title="aws-credentials",
+    nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+)
+```
+
+Only the mapped sub-field is set from the record; every other sub-field of
+`aws_client_parameters` keeps its own default.
 
 The Keeper SDK (`keeper-secrets-manager-core`) must be installed to use this
 source. The extra `prefector[keeper]` provides it.

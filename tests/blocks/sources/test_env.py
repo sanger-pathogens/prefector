@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from prefector.blocks.sources.env import env_settings_model_for_block
 
 
-def test_env_settings_model_for_block_supports_nested_env(monkeypatch):
+def test_env_settings_model_for_block_supports_nested_fields(monkeypatch):
     class NestedValue(BaseModel):
         endpoint_url: str
 
@@ -13,14 +13,37 @@ def test_env_settings_model_for_block_supports_nested_env(monkeypatch):
 
     settings_cls = env_settings_model_for_block(
         NestedBlock,
-        env_prefix="TEST_",
-        env_nested_delimiter="__",
+        nested_fields={"endpoint.endpoint_url": "TEST_ENDPOINT_URL"},
     )
-    monkeypatch.setenv("TEST_ENDPOINT__ENDPOINT_URL", "http://service.local")
+    monkeypatch.setenv("TEST_ENDPOINT_URL", "http://service.local")
 
     payload = settings_cls().model_dump()
 
     assert payload == {"endpoint": {"endpoint_url": "http://service.local"}}
+
+
+def test_env_settings_model_for_block_nested_fields_merges_multiple_subfields(monkeypatch):
+    class ClientParameters(BaseModel):
+        endpoint_url: str | None = None
+        api_version: str | None = None
+
+    class AwsCredsBlock(Block):
+        aws_client_parameters: ClientParameters = ClientParameters()
+
+    settings_cls = env_settings_model_for_block(
+        AwsCredsBlock,
+        nested_fields={
+            "aws_client_parameters.endpoint_url": "AWS_HOSTNAME",
+            "aws_client_parameters.api_version": "AWS_API_VERSION",
+        },
+    )
+    monkeypatch.setenv("AWS_HOSTNAME", "minio.local:9000")
+    monkeypatch.setenv("AWS_API_VERSION", "2016-11-15")
+
+    settings = settings_cls()
+
+    assert settings.aws_client_parameters.endpoint_url == "minio.local:9000"
+    assert settings.aws_client_parameters.api_version == "2016-11-15"
 
 
 def test_env_settings_model_for_block_field_aliases_renames_without_block_subclass(monkeypatch):
@@ -36,3 +59,21 @@ def test_env_settings_model_for_block_field_aliases_renames_without_block_subcla
     settings = settings_cls()
 
     assert settings.aws_access_key_id == "AKIA..."
+
+
+def test_env_settings_model_for_block_nested_fields_missing_var_keeps_default(monkeypatch):
+    class ClientParameters(BaseModel):
+        endpoint_url: str | None = None
+
+    class AwsCredsBlock(Block):
+        aws_client_parameters: ClientParameters = ClientParameters()
+
+    settings_cls = env_settings_model_for_block(
+        AwsCredsBlock,
+        nested_fields={"aws_client_parameters.endpoint_url": "AWS_HOSTNAME"},
+    )
+    monkeypatch.delenv("AWS_HOSTNAME", raising=False)
+
+    settings = settings_cls()
+
+    assert settings.aws_client_parameters.endpoint_url is None

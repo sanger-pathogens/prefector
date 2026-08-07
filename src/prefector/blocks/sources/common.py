@@ -1,6 +1,17 @@
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from pydantic import Field
+
+
+def apply_nested_fields(d: dict[str, Any], nested_fields: dict[str, str], lookup: Callable[[str], Any]) -> None:
+    for path, key in nested_fields.items():
+        field_name, _, subfield_name = path.partition(".")
+        value = lookup(key)
+        if value is None:
+            continue
+        nested = d.setdefault(field_name, {})
+        if isinstance(nested, dict):
+            nested[subfield_name] = value
 
 
 def field_definitions_for_block(
