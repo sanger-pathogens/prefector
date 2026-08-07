@@ -21,21 +21,29 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
     field_aliases: dict[str, str] | None = None,
     nested_fields: dict[str, str] | None = None,
 ) -> type[BaseSettings]:
-    """
-    Build a BaseSettings model from an existing Pydantic/Block model, sourced from a
-    Keeper Secrets Manager record instead of the environment.
+    """Build a `BaseSettings` class from a Block's fields, sourced from a Keeper record.
 
-    `field_types` allows overriding selected field annotations, useful for
-    nested settings structures (for example, replacing a complex block field
-    with another settings model).
+    Args:
+        block_cls: The Block class to build settings for.
+        record_title: The Keeper record's base title.
+        record_prefix: Prepended before `record_title` when assembling the full title.
+        record_suffix: Appended after `record_title` when assembling the full title.
+        separator: Joins `record_prefix`/`record_title`/`record_suffix`.
+        ksm_token: Base64 encoded Keeper configuration file. Falls back to the `KSM_CONFIG` environment
+            variable if omitted; raises an error if neither are set.
+        field_types: Overrides a field's annotation by name — useful for nested settings
+            structures (for example, replacing a complex block field with another
+            settings model).
+        field_aliases: Reads a field from a specific Keeper field/custom name, without
+            requiring a Block subclass just to rename a field — useful for third-party
+            blocks you don't want to modify.
+        nested_fields: Maps a dotted `"<field>.<subfield>"` path to a Keeper field
+            name, for populating one sub-field of a nested model field (for example,
+            Prefect's `AwsCredentials.aws_client_parameters.endpoint_url`) from a flat
+            Keeper record.
 
-    `field_aliases` reads a field from a specific Keeper field/custom name, without
-    requiring a Block subclass just to rename a field — useful for third-party blocks
-    you don't want to modify.
-
-    `nested_fields` maps a dotted `<field>.<subfield>` path to a Keeper field/custom
-    name, for populating one sub-field of a nested model field (for example, Prefect's
-    `AwsCredentials.aws_client_parameters.endpoint_url`) from a flat Keeper record.
+    Returns:
+        A `BaseSettings` subclass ready to be instantiated, e.g. as a `BlockSpec.settings_cls`.
     """
     definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
@@ -117,6 +125,18 @@ class KeeperSettingsSource(PydanticBaseSettingsSource):
         ksm_token: str | None = None,
         nested_fields: dict[str, str] | None = None,
     ) -> None:
+        """
+        Args:
+            settings_cls: The settings class this source resolves values for.
+            record_title: The Keeper record's base title.
+            record_prefix: Prepended before `record_title` when assembling the full title.
+            record_suffix: Appended after `record_title` when assembling the full title.
+            separator: Joins `record_prefix`/`record_title`/`record_suffix`.
+            ksm_token: Base64 encoded Keeper configuration file. Falls back to the `KSM_CONFIG` environment
+                variable if omitted; raises an error if neither are set.
+            nested_fields: Maps a dotted `"<field>.<subfield>"` path to a Keeper
+                field name.
+        """
         super().__init__(settings_cls)
         self._record_title = separator.join(part for part in (record_prefix, record_title, record_suffix) if part)
         self._ksm_token = ksm_token

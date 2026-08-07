@@ -4,6 +4,21 @@ from pydantic import Field
 
 
 def apply_nested_fields(d: dict[str, Any], nested_fields: dict[str, str], lookup: Callable[[str], Any]) -> None:
+    """Populate one sub-field of a nested model field from a flat lookup, in place.
+
+    Used by settings sources that only resolve top-level fields (env var names, Keeper
+    record fields) but need to reach one sub-field of a nested model field — for example
+    Prefect's built-in `AwsCredentials.aws_client_parameters.endpoint_url`.
+
+    Args:
+        d: The dict of resolved top-level field values being built by the source.
+            Modified in place; existing entries (for this or other fields) are preserved.
+        nested_fields: Maps a dotted `"<field>.<subfield>"` path to a key passed to
+            `lookup` (an env var name, a Keeper field/custom name, etc).
+        lookup: Called with each `nested_fields` value; returns the resolved value, or
+            `None` if it isn't available, in which case that sub-field is left unset and
+            falls back to its own default.
+    """
     for path, key in nested_fields.items():
         field_name, _, subfield_name = path.partition(".")
         value = lookup(key)
@@ -19,6 +34,25 @@ def field_definitions_for_block(
     field_types: Optional[dict[str, type[Any]]] = None,
     field_aliases: Optional[dict[str, str]] = None,
 ) -> dict[str, tuple[Any, Any]]:
+    """Reflect a Block/pydantic model's fields into `pydantic.create_model` definitions.
+
+    Reproduces each field's annotation, default (or default factory), and required-ness
+    on a new model, so a settings class can be generated from a Block.
+
+    Args:
+        block_cls: The Block (or any pydantic model) class to reflect over.
+        field_types: Overrides a field's annotation by name — useful for nested settings
+            structures (for example, replacing a complex block field with another
+            settings model).
+        field_aliases: Sets/overrides a field's `validation_alias` by name, without
+            requiring a Block subclass — useful when the block class itself (e.g. a
+            third-party Prefect collection block) shouldn't be modified just to rename a
+            field for one source. Overrides any `validation_alias` already on the field.
+
+    Returns:
+        A dict of `{field_name: (annotation, default)}`, suitable as `**kwargs` to
+        `pydantic.create_model`.
+    """
     field_types = field_types or {}
     field_aliases = field_aliases or {}
     definitions: dict[str, tuple[Any, Any]] = {}

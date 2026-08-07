@@ -29,20 +29,25 @@ def env_settings_model_for_block(  # noqa: PLR0913
     field_aliases: Optional[dict[str, str]] = None,
     nested_fields: Optional[dict[str, str]] = None,
 ) -> type[BaseSettings]:
-    """
-    Build a BaseSettings model from an existing Pydantic/Block model.
+    """Build a `BaseSettings` class from a Block's fields, sourced from the environment.
 
-    `field_types` allows overriding selected field annotations, useful for
-    nested settings structures (for example, replacing a complex block field
-    with another settings model).
+    Each field reads from `<env_prefix><FIELD_NAME>` by default.
 
-    `field_aliases` reads a field from a specific full env var name (bypassing
-    `env_prefix`), without requiring a Block subclass just to rename a field —
-    useful for third-party blocks you don't want to modify.
+    Args:
+        block_cls: The Block class to build settings for.
+        env_prefix: Prefix applied to every field's env var name.
+        field_types: Overrides a field's annotation by name — useful for nested settings
+            structures (for example, replacing a complex block field with another
+            settings model).
+        field_aliases: Reads a field from a specific full env var name (bypassing
+            `env_prefix`), without requiring a Block subclass just to rename a field —
+            useful for third-party blocks you don't want to modify.
+        nested_fields: Maps a dotted `"<field>.<subfield>"` path to a full env var name,
+            for populating one sub-field of a nested model field (for example, Prefect's
+            `AwsCredentials.aws_client_parameters.endpoint_url`).
 
-    `nested_fields` maps a dotted `<field>.<subfield>` path to a full env var name, for
-    populating one sub-field of a nested model field (for example, Prefect's
-    `AwsCredentials.aws_client_parameters.endpoint_url`).
+    Returns:
+        A `BaseSettings` subclass ready to be instantiated, e.g. as a `BlockSpec.settings_cls`.
     """
     definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
