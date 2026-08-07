@@ -109,7 +109,7 @@ def test_passes_ksm_token_to_secrets_manager():
         _settings_cls(record_title="trino-credentials", ksm_token="one-time-token")()
 
     mock_storage_cls.assert_called_once_with("one-time-token")
-    mock_sm_cls.assert_called_once_with(token="one-time-token", config=mock_storage_cls.return_value)
+    mock_sm_cls.assert_called_once_with(config=mock_storage_cls.return_value)
 
 
 def test_raises_when_record_not_found():
@@ -153,7 +153,7 @@ def test_falls_back_to_ksm_config_env_var_when_token_omitted(monkeypatch):
         _settings_cls(record_title="trino-credentials")()
 
     mock_storage_cls.assert_called_once_with("config-from-env")
-    mock_sm_cls.assert_called_once_with(token="config-from-env", config=mock_storage_cls.return_value)
+    mock_sm_cls.assert_called_once_with(config=mock_storage_cls.return_value)
 
 
 def test_raises_when_no_token_and_no_ksm_config_env_var(monkeypatch):

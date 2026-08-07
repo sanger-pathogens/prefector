@@ -88,7 +88,7 @@ def _secrets_manager(ksm_token: str | None):
         raise ValueError(
             "No Keeper token provided. Pass ksm_token explicitly or set the KSM_CONFIG environment variable."
         )
-    return SecretsManager(token=token, config=InMemoryKeyValueStorage(token))
+    return SecretsManager(config=InMemoryKeyValueStorage(token))
 
 
 def _keeper_field_value(record: Any, name: str) -> Any:
