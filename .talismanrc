@@ -3,3 +3,10 @@ fileignoreconfig:
 - filename: poetry.lock
   allowed_patterns:
     - ".*"
+- filename: tests/blocks/sources/test_env.py
+  allowed_patterns:
+    - "aws_access_key_id"
+- filename: tests/blocks/sources/test_keeper.py
+  allowed_patterns:
+    - "aws_access_key_id"
+    - "aws_secret_access_key"

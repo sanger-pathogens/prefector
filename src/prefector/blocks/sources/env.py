@@ -12,6 +12,7 @@ def env_settings_model_for_block(  # noqa: PLR0913
     env_prefix: str = "",
     env_nested_delimiter: str = "__",
     field_types: Optional[dict[str, type[Any]]] = None,
+    field_aliases: Optional[dict[str, str]] = None,
 ) -> type[BaseSettings]:
     """
     Build a BaseSettings model from an existing Pydantic/Block model.
@@ -19,8 +20,12 @@ def env_settings_model_for_block(  # noqa: PLR0913
     `field_types` allows overriding selected field annotations, useful for
     nested settings structures (for example, replacing a complex block field
     with another settings model).
+
+    `field_aliases` reads a field from a specific full env var name (bypassing
+    `env_prefix`), without requiring a Block subclass just to rename a field —
+    useful for third-party blocks you don't want to modify.
     """
-    definitions = field_definitions_for_block(block_cls, field_types)
+    definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
     settings_cls = create_model(
         f"{block_cls.__name__}Settings",

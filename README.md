@@ -71,7 +71,7 @@ passes the resolved values to the block.
 
 ### Sourcing from the environment
 
-`env_settings_model_for_block(block_cls, *, env_prefix="", env_nested_delimiter="__", field_types=None)`
+`env_settings_model_for_block(block_cls, *, env_prefix="", env_nested_delimiter="__", field_types=None, field_aliases=None)`
 builds a settings class that reads each field from `<env_prefix><FIELD_NAME>`:
 
 ```python
@@ -82,9 +82,20 @@ settings_cls = env_settings_model_for_block(TrinoBlock, env_prefix="TRINO_")
 If a required env var is missing, `prefector blocks deploy` exits with a clear
 error naming the variable that needs to be set.
 
+To read a field from a specific full env var name instead (bypassing
+`env_prefix` for just that field), use `field_aliases` — this works for
+third-party blocks (e.g. `prefect_aws.AwsCredentials`) without subclassing them:
+
+```python
+settings_cls = env_settings_model_for_block(
+    AwsCredentials,
+    field_aliases={"aws_access_key_id": "AWS_ACCESS_KEY_ID_OVERRIDE"},
+)
+```
+
 ### Sourcing from Keeper Secrets Manager
 
-`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None)`
+`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None, field_aliases=None)`
 builds a settings class that reads each field from a Keeper record instead:
 
 ```python
@@ -123,8 +134,19 @@ settings_cls = keeper_settings_model_for_block(TrinoBlock, record_title="trino-c
 
 Fields are matched to the record by field name, checking standard fields
 (matched by type) then custom fields (matched by label). To read from a
-differently-named record field, give the block field a pydantic
-`validation_alias`:
+differently-named record field, use `field_aliases` — no block subclass
+required, so it works for third-party blocks like `prefect_aws.AwsCredentials`:
+
+```python
+settings_cls = keeper_settings_model_for_block(
+    AwsCredentials,
+    record_title="aws-credentials",
+    field_aliases={"aws_access_key_id": "access_key", "aws_secret_access_key": "secret_key"},
+)
+```
+
+If you own the block class, giving the field a pydantic `validation_alias`
+directly works too — `field_aliases` overrides it if both are set:
 
 ```python
 from pydantic import Field

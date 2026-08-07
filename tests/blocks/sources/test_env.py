@@ -21,3 +21,18 @@ def test_env_settings_model_for_block_supports_nested_env(monkeypatch):
     payload = settings_cls().model_dump()
 
     assert payload == {"endpoint": {"endpoint_url": "http://service.local"}}
+
+
+def test_env_settings_model_for_block_field_aliases_renames_without_block_subclass(monkeypatch):
+    class ThirdPartyBlock(Block):
+        aws_access_key_id: str
+
+    settings_cls = env_settings_model_for_block(
+        ThirdPartyBlock,
+        field_aliases={"aws_access_key_id": "ACCESS_KEY"},
+    )
+    monkeypatch.setenv("ACCESS_KEY", "AKIA...")
+
+    settings = settings_cls()
+
+    assert settings.aws_access_key_id == "AKIA..."

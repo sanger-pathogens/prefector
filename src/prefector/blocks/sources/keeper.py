@@ -18,6 +18,7 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
     separator: str = ":",
     ksm_token: str | None = None,
     field_types: dict[str, type[Any]] | None = None,
+    field_aliases: dict[str, str] | None = None,
 ) -> type[BaseSettings]:
     """
     Build a BaseSettings model from an existing Pydantic/Block model, sourced from a
@@ -26,8 +27,12 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
     `field_types` allows overriding selected field annotations, useful for
     nested settings structures (for example, replacing a complex block field
     with another settings model).
+
+    `field_aliases` reads a field from a specific Keeper field/custom name, without
+    requiring a Block subclass just to rename a field — useful for third-party blocks
+    you don't want to modify.
     """
-    definitions = field_definitions_for_block(block_cls, field_types)
+    definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
     settings_cls = create_model(
         f"{block_cls.__name__}KeeperSettings",

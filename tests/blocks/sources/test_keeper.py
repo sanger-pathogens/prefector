@@ -183,6 +183,30 @@ def test_keeper_settings_model_for_block_reads_matching_fields():
     assert settings.port == 8080  # not in the record — falls back to the block's own default
 
 
+def test_keeper_settings_model_for_block_field_aliases_renames_without_block_subclass():
+    """field_aliases renames a field for this source without touching the block class"""
+
+    class _ThirdPartyBlock(Block):
+        aws_access_key_id: str
+        aws_secret_access_key: str
+
+    record = _make_keeper_record(custom={"access_key": "AKIA...", "secret_key": "s3cr3t"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    settings_cls = keeper_settings_model_for_block(
+        _ThirdPartyBlock,
+        record_title="aws-credentials",
+        ksm_token="dummy-token",
+        field_aliases={"aws_access_key_id": "access_key", "aws_secret_access_key": "secret_key"},
+    )
+    with _mock_keeper_sdk(mock_sm):
+        settings = settings_cls()
+
+    assert settings.aws_access_key_id == "AKIA..."
+    assert settings.aws_secret_access_key == "s3cr3t"
+
+
 def test_keeper_settings_model_for_block_preserves_default_factory():
     class _TaggedBlock(Block):
         username: str
