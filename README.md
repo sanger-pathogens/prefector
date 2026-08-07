@@ -40,155 +40,101 @@ Deployment specs are YAML files loaded as `prefector.DeploymentSpec`.
 
 Each block spec is a Python module in the `--blocks-dir` directory. A module
 must expose a `BLOCKS` list of `BlockSpec` objects, each pairing a
-`pydantic_settings.BaseSettings` subclass (which reads field values from the
-environment) with a Prefect `Block` subclass.
+`pydantic_settings.BaseSettings` subclass with a Prefect `Block` subclass.
+
+Block classes are source-agnostic: the same `TrinoBlock` can be sourced from
+environment variables in one project and from Keeper Secrets Manager in
+another — the spec file decides, not the block class. `prefector` provides two
+factories that build a `BaseSettings` subclass directly from a block's own
+fields, so you don't hand-write one per block:
 
 ```python
 # blocks/trino.py
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from prefect_sqlalchemy import DatabaseCredentials, SyncDriver
+from prefector import env_settings_model_for_block
 from prefector.blocks.base import BlockSpec
-
-class TrinoSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="TRINO_")
-    user: str
-    password: str
-    host: str
-    port: int = 8080
 
 class TrinoBlock(DatabaseCredentials):
     ...
 
-BLOCKS = [BlockSpec(name="trino-credentials", settings_cls=TrinoSettings, block_cls=TrinoBlock)]
+BLOCKS = [
+    BlockSpec(
+        name="trino-credentials",
+        block_cls=TrinoBlock,
+        settings_cls=env_settings_model_for_block(TrinoBlock, env_prefix="TRINO_"),
+    ),
+]
 ```
 
-When `prefector blocks deploy` runs, it instantiates `TrinoSettings()` — which
-reads `TRINO_USER`, `TRINO_PASSWORD`, etc. from the environment — and passes the
-values to the block.
+When `prefector blocks deploy` runs, it instantiates the settings class and
+passes the resolved values to the block.
 
-## Block sources
+### Sourcing from the environment
 
-A `block-sources.yaml` file lets different teams use the same block spec modules
-while sourcing secret values from different backends (environment variables or
-Keeper Secrets Manager) and with different field naming conventions.
+`env_settings_model_for_block(block_cls, *, env_prefix="", env_nested_delimiter="__", field_types=None)`
+builds a settings class that reads each field from `<env_prefix><FIELD_NAME>`:
 
-**It is not required.** Blocks that already define their own `settings_cls` with
-the right env prefix will continue to work exactly as before. Only add a
-block-sources entry when you need to override where values come from.
-
-### Loading
-
-Provide the file explicitly:
-
-```bash
-prefector blocks deploy --blocks-dir path/to/specs --sources path/to/block-sources.yaml
+```python
+settings_cls = env_settings_model_for_block(TrinoBlock, env_prefix="TRINO_")
+# reads TRINO_USER, TRINO_PASSWORD, TRINO_HOST, TRINO_PORT
 ```
 
-Or place it at `block-sources.yaml` inside `--blocks-dir` and it will be picked
-up automatically with no extra flags needed.
+If a required env var is missing, `prefector blocks deploy` exits with a clear
+error naming the variable that needs to be set.
 
-### File format
+### Sourcing from Keeper Secrets Manager
 
-Three equivalent YAML shapes are accepted:
+`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None)`
+builds a settings class that reads each field from a Keeper record instead:
 
-**Flat mapping** (simplest):
-```yaml
-trino-credentials:
-  source: env
-  env_var_prefix: TRINO_
-```
+```python
+from prefector import keeper_settings_model_for_block
 
-**List** (useful when ordering matters or you prefer the list style):
-```yaml
-- trino-credentials:
-    source: env
-    env_var_prefix: TRINO_
-- other-block:
-    source: keeper
-    record_title: trino-credentials
-```
-
-**`blocks:` wrapper** (same list, under an explicit key):
-```yaml
-blocks:
-  - trino-credentials:
-      source: env
-      env_var_prefix: TRINO_
-```
-
-### Block Properties
-Each block must define a source and the required fields for that source. Additionally, there are other keys that can be used:
-
-`blocks` is used when Prefect allows two blocks to be linked (e.g. S3 bucket and AWS Credentials)
-Provide a list of YAML mappings for block names and the field to be populated with that block's values.
-In the below case, the `credentials` field will be populated with the values from the `aws-credentials` block.
-```yaml
-blocks:
-  credentials: aws-credentials
-```
-The named block will be loaded from Prefect so must have already been deployed before this block.
-### Environment variable source
-
-Reads block field values from environment variables.
-
-```yaml
-trino-credentials:
-  source: env
-  env_var_prefix: TRINO_          # env vars are read as <prefix><field>
-  fields:                          # optional: override individual field names
-    user: USERNAME                 # reads TRINO_USERNAME into field `user`
-    password: PASSWORD             # reads TRINO_PASSWORD into field `password`
-    # unlisted fields use the field name as-is: `host` -> TRINO_host
-```
-
-The `fields` mapping is optional. Without it, each block field is read from
-`<env_var_prefix><field_name>` (case-insensitive). Only add `fields` entries
-when the env var suffix differs from the field name.
-
-If a required env var is missing, the command exits with a clear error naming
-the variable that needs to be set.
-
-### Keeper Secrets Manager source
-
-Reads block field values from a record in Keeper Secrets Manager.
-
-```yaml
-trino-credentials:
-  source: keeper
-  record_title: trino-credentials  # required: base record title
-  record_prefix: dlh               # optional: prepended before title
-  record_suffix: ${ENVIRONMENT}    # optional: appended after title
-  separator: ":"                   # optional: joins the parts (default: ":"); must be quoted in YAML
-  ksm_token: ${KSM_TOKEN}          # optional: one-time token; falls back to KSM_CONFIG env var
-  fields:                          # optional: map block field -> KSM field title
-    user: login                    # reads KSM field "login" into block field `user`
-    # unlisted fields use the field name as-is
+settings_cls = keeper_settings_model_for_block(
+    TrinoBlock,
+    record_title="trino-credentials",
+    record_prefix="dlh",
+    record_suffix="prod",
+)
 ```
 
 The full record title is assembled as
 `<record_prefix><separator><record_title><separator><record_suffix>`, with any
-absent components skipped cleanly (no leading or trailing separator):
+absent components skipped cleanly (no leading or trailing separator).
 
-The Keeper SDK (`keeper-secrets-manager-core`) must be installed to read values from Keeper. The
-extra `prefector[keeper]` provides this.
+#### Providing the Keeper token
 
-### Environment variable substitution
+A token is required to connect to Keeper. It's resolved in this order:
 
-Any string value in `block-sources.yaml` may use `${VAR_NAME}` syntax.
-Substitution happens at build time (when `prefector blocks deploy` runs), so
-you can parameterise record names, prefixes, or tokens from CI environment
-variables:
+1. The `ksm_token` argument, if given explicitly.
+2. The `KSM_CONFIG` environment variable, if `ksm_token` is omitted.
 
-```yaml
-trino-credentials:
-  source: keeper
-  record_title: trino-credentials
-  record_suffix: ${ENVIRONMENT}   # e.g. resolves to "prod" or "staging"
-  ksm_token: ${KSM_TOKEN}
+If neither is set, an error is raised.
+
+```python
+# Explicit token
+settings_cls = keeper_settings_model_for_block(
+    TrinoBlock, record_title="trino-credentials", ksm_token=os.environ["MY_KEEPER_TOKEN"],
+)
+
+# Or omit ksm_token and set KSM_CONFIG in the environment instead (e.g. in CI)
+settings_cls = keeper_settings_model_for_block(TrinoBlock, record_title="trino-credentials")
 ```
 
-All referenced variables must be set at deploy time, or the command will exit
-with an error naming the missing variable.
+Fields are matched to the record by field name, checking standard fields
+(matched by type) then custom fields (matched by label). To read from a
+differently-named record field, give the block field a pydantic
+`validation_alias`:
+
+```python
+from pydantic import Field
+
+class TrinoBlock(DatabaseCredentials):
+    user: str = Field(validation_alias="login")
+```
+
+The Keeper SDK (`keeper-secrets-manager-core`) must be installed to use this
+source. The extra `prefector[keeper]` provides it.
 
 ## Deployment spec
 
