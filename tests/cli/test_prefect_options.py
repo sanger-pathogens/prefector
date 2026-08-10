@@ -1,6 +1,5 @@
 import click
 import pytest
-from click.testing import CliRunner
 
 from prefector.prefect_connection.connection import detect_auth_mode
 from prefector.prefect_connection.options import (
@@ -15,35 +14,6 @@ def _cmd(connection: PrefectConnectionArgs):
     click.echo(f"api_url={connection.api_url}")
     click.echo(f"api_auth_string={connection.api_auth_string}")
     click.echo(f"direct_grant_client_id={connection.keycloak_direct_grant_client_id}")
-
-
-@pytest.fixture
-def runner():
-    return CliRunner()
-
-
-@pytest.fixture(scope="module")
-def connection_defaults():
-    return {
-        "api_url": "http://localhost:4200/api",
-        "ssl_cert": None,
-        "api_auth_string": None,
-        "keycloak_token_url": None,
-        "keycloak_scope": "openid profile email",
-        "keycloak_username": None,
-        "keycloak_password": None,
-        "keycloak_direct_grant_client_id": "prefect-cli",
-        "keycloak_client_id": None,
-        "keycloak_client_secret": None,
-    }
-
-
-@pytest.fixture
-def build_connection(connection_defaults):
-    def _build(**overrides):
-        return PrefectConnectionArgs(**(connection_defaults | overrides))
-
-    return _build
 
 
 def test_detect_auth_mode_returns_none_with_no_auth(build_connection):

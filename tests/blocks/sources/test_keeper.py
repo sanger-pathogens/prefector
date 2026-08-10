@@ -20,12 +20,17 @@ def _make_keeper_record(
     return record
 
 
-def _mock_keeper_sdk(mock_sm: MagicMock):
+def _mock_keeper_sdk(
+    mock_sm: MagicMock,
+    *,
+    sm_cls: MagicMock | None = None,
+    storage_cls: MagicMock | None = None,
+):
     return patch.dict(
         "sys.modules",
         {
-            "keeper_secrets_manager_core": MagicMock(SecretsManager=MagicMock(return_value=mock_sm)),
-            "keeper_secrets_manager_core.storage": MagicMock(InMemoryKeyValueStorage=MagicMock()),
+            "keeper_secrets_manager_core": MagicMock(SecretsManager=sm_cls or MagicMock(return_value=mock_sm)),
+            "keeper_secrets_manager_core.storage": MagicMock(InMemoryKeyValueStorage=storage_cls or MagicMock()),
         },
     )
 
@@ -99,13 +104,7 @@ def test_passes_ksm_token_to_secrets_manager():
     mock_sm_cls = MagicMock(return_value=mock_sm)
     mock_storage_cls = MagicMock()
 
-    with patch.dict(
-        "sys.modules",
-        {
-            "keeper_secrets_manager_core": MagicMock(SecretsManager=mock_sm_cls),
-            "keeper_secrets_manager_core.storage": MagicMock(InMemoryKeyValueStorage=mock_storage_cls),
-        },
-    ):
+    with _mock_keeper_sdk(mock_sm, sm_cls=mock_sm_cls, storage_cls=mock_storage_cls):
         _settings_cls(record_title="trino-credentials", ksm_token="one-time-token")()
 
     mock_storage_cls.assert_called_once_with("one-time-token")
@@ -143,13 +142,7 @@ def test_falls_back_to_ksm_config_env_var_when_token_omitted(monkeypatch):
     mock_sm_cls = MagicMock(return_value=mock_sm)
     mock_storage_cls = MagicMock()
 
-    with patch.dict(
-        "sys.modules",
-        {
-            "keeper_secrets_manager_core": MagicMock(SecretsManager=mock_sm_cls),
-            "keeper_secrets_manager_core.storage": MagicMock(InMemoryKeyValueStorage=mock_storage_cls),
-        },
-    ):
+    with _mock_keeper_sdk(mock_sm, sm_cls=mock_sm_cls, storage_cls=mock_storage_cls):
         _settings_cls(record_title="trino-credentials")()
 
     mock_storage_cls.assert_called_once_with("config-from-env")

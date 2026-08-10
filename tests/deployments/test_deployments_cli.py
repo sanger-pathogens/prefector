@@ -31,6 +31,20 @@ def deployments(build_spec) -> list[DeploymentSpec]:
     ]
 
 
+def _create_work_pool(name: str) -> None:
+    with get_client(sync_client=True) as client:
+        client.create_work_pool(
+            WorkPoolCreate(
+                name=name,
+                base_job_template={
+                    "job_configuration": {"image": "{{ image }}"},
+                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
+                },
+            ),
+            overwrite=True,
+        )
+
+
 def test_select_targets_returns_all_when_selected_empty(deployments):
     assert deploy_cmd._select_targets(set(), deployments) == deployments
 
@@ -68,18 +82,7 @@ def test_build_image_name_supports_empty_prefix():
 
 def test_deploy_target(monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir):
     pool_name = "test-pool"
-
-    with get_client(sync_client=True) as client:
-        client.create_work_pool(
-            WorkPoolCreate(
-                name=pool_name,
-                base_job_template={
-                    "job_configuration": {"image": "{{ image }}"},
-                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
-                },
-            ),
-            overwrite=True,
-        )
+    _create_work_pool(pool_name)
 
     deployment_spec_dict["cron"] = "0 0 * * *"
     spec = DeploymentSpec(**deployment_spec_dict)
@@ -112,18 +115,7 @@ def test_deploy_target_applies_concurrency_options(
     monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir
 ):
     pool_name = "test-pool-concurrency"
-
-    with get_client(sync_client=True) as client:
-        client.create_work_pool(
-            WorkPoolCreate(
-                name=pool_name,
-                base_job_template={
-                    "job_configuration": {"image": "{{ image }}"},
-                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
-                },
-            ),
-            overwrite=True,
-        )
+    _create_work_pool(pool_name)
 
     spec = DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 1, "collision_strategy": "CANCEL_NEW"}))
 
@@ -302,18 +294,7 @@ def test_run_flow_triggers_deployment_end_to_end(
     monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir, base_args
 ):
     pool_name = "test-pool-run"
-
-    with get_client(sync_client=True) as client:
-        client.create_work_pool(
-            WorkPoolCreate(
-                name=pool_name,
-                base_job_template={
-                    "job_configuration": {"image": "{{ image }}"},
-                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
-                },
-            ),
-            overwrite=True,
-        )
+    _create_work_pool(pool_name)
 
     spec = DeploymentSpec(**deployment_spec_dict)
     monkeypatch.chdir(deployment_flow_dir)

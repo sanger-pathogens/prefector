@@ -6,11 +6,6 @@ from prefector.cli import cli
 from prefector.errors import handle_errors
 
 
-@pytest.fixture
-def runner():
-    return CliRunner()
-
-
 @click.command()
 @click.pass_context
 def _raises_value_error(ctx):

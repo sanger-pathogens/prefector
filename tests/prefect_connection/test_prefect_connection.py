@@ -11,7 +11,6 @@ from prefect.settings import (
 )
 
 from prefector.prefect_connection import connection as pc
-from prefector.prefect_connection.options import PrefectConnectionArgs
 
 
 class _Response:
@@ -29,30 +28,6 @@ class _Response:
         if self._json_error is not None:
             raise self._json_error
         return self._payload
-
-
-@pytest.fixture(scope="module")
-def prefect_args_defaults():
-    return {
-        "api_url": "http://prefect.localhost:24200/api",
-        "ssl_cert": None,
-        "api_auth_string": None,
-        "keycloak_token_url": None,
-        "keycloak_scope": "openid profile email",
-        "keycloak_username": None,
-        "keycloak_password": None,
-        "keycloak_direct_grant_client_id": "prefect-cli",
-        "keycloak_client_id": None,
-        "keycloak_client_secret": None,
-    }
-
-
-@pytest.fixture
-def build_connection(prefect_args_defaults):
-    def _build(**overrides):
-        return PrefectConnectionArgs(**(prefect_args_defaults | overrides))
-
-    return _build
 
 
 @pytest.fixture
@@ -125,7 +100,7 @@ def test_generate_prefect_settings_basic_auth(monkeypatch, build_connection):
     monkeypatch.setattr(pc, "exchange_keycloak_token", _token)
     settings = pc.generate_prefect_settings(build_connection(api_auth_string="user:pass"))
 
-    assert settings[PREFECT_API_URL] == "http://prefect.localhost:24200/api"
+    assert settings[PREFECT_API_URL] == "http://localhost:4200/api"
     assert settings[PREFECT_API_AUTH_STRING] == "user:pass"
     assert PREFECT_CLIENT_CUSTOM_HEADERS not in settings
     assert called["token"] is False
@@ -242,7 +217,7 @@ def test_generate_prefect_settings_requires_keycloak_token_url_for_keycloak_mode
 
 def test_generate_prefect_settings_allows_no_auth_mode(build_connection):
     settings = pc.generate_prefect_settings(build_connection())
-    assert settings[PREFECT_API_URL] == "http://prefect.localhost:24200/api"
+    assert settings[PREFECT_API_URL] == "http://localhost:4200/api"
     assert PREFECT_API_AUTH_STRING not in settings
     assert PREFECT_CLIENT_CUSTOM_HEADERS not in settings
 

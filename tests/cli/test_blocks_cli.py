@@ -1,14 +1,6 @@
-import pytest
-from click.testing import CliRunner
-
 from prefector.blocks.cli import blocks_command as blocks
 
 BASE_ARGS = ["--api-url", "http://test/api"]
-
-
-@pytest.fixture
-def runner():
-    return CliRunner()
 
 
 def test_blocks_deploy_with_api_url_succeeds(runner, monkeypatch, tmp_path):
