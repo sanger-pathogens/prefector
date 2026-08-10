@@ -12,8 +12,11 @@ from prefect.blocks.core import Block
 from prefect.exceptions import PrefectException
 from pydantic import StringConstraints, ValidationError
 from pydantic_settings import BaseSettings
+from rich.console import Console
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+CONSOLE = Console()
 
 
 class BlockBuildError(ValueError):
@@ -91,6 +94,12 @@ class BlockSpec:
                     ) from exc
 
         return payload
+
+
+def print_block_header(spec: BlockSpec) -> None:
+    CONSOLE.print("[blue]──[/blue]")
+    CONSOLE.print(f"Block: [bold]{spec.name}[/bold]")
+    CONSOLE.print(f"[dim]Type: [/dim] {spec.block_cls.__name__}")
 
 
 def _already_loaded_module(module_name: str, module_path: Path):

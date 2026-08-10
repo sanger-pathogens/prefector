@@ -13,7 +13,13 @@ from prefect.settings import temporary_settings
 from prefect.types.entrypoint import EntrypointType
 from rich.console import Console
 
-from prefector.deployments.base import DeploymentSpec, _resolve_env_dict, load_deployments, load_image_manifest
+from prefector.deployments.base import (
+    DeploymentSpec,
+    _resolve_env_dict,
+    load_deployments,
+    load_image_manifest,
+    print_deployment_header,
+)
 from prefector.deployments.options import (
     DeploymentDeployOptions,
     DeploymentOptions,
@@ -25,13 +31,6 @@ from prefector.prefect_connection.connection import generate_prefect_settings
 from prefector.prefect_connection.options import PrefectConnectionArgs, prefect_connection_options
 
 CONSOLE = Console()
-
-
-def _print_deployment_header(spec: DeploymentSpec) -> None:
-    CONSOLE.print("[blue]──[/blue]")
-    CONSOLE.print(f"Deployment: [bold]{spec.name}[/bold]")
-    CONSOLE.print(f"[dim]Flow:[/dim] {spec.function}")
-    CONSOLE.print(f"[dim]Image:[/dim] {spec.image_key}")
 
 
 def _select_targets(selected: Iterable[str], deployments: list[DeploymentSpec]) -> list[DeploymentSpec]:
@@ -85,7 +84,7 @@ def deploy_target(  # noqa: PLR0913
     image: str,
     dry_run: bool,
 ):
-    _print_deployment_header(spec)
+    print_deployment_header(spec)
     CONSOLE.print("[1/3] Preparing deployment")
 
     flow_obj = _resolve_flow(spec)

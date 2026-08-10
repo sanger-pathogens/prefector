@@ -7,7 +7,6 @@ from prefector.blocks.list import list_blocks
 @click.group(name="blocks")
 def blocks_command():
     """List or deploy Prefect blocks"""
-    pass
 
 
 blocks_command.add_command(deploy)

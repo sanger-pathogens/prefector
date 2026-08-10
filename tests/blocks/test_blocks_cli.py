@@ -50,7 +50,7 @@ def test_deploy_block_builds_from_spec_settings(monkeypatch):
 
 def test_print_blocks_uses_block_header(monkeypatch):
     buf = StringIO()
-    monkeypatch.setattr(list_module, "CONSOLE", Console(file=buf, highlight=False))
+    monkeypatch.setattr(base, "CONSOLE", Console(file=buf, highlight=False))
     list_module.print_blocks([_spec("a")])
     out = buf.getvalue()
     assert "a" in out

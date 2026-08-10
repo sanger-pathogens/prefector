@@ -17,8 +17,11 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+from rich.console import Console
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+CONSOLE = Console()
 
 
 def _substitute_env_vars(text: str, source: Path) -> str:
@@ -138,6 +141,13 @@ class DeploymentSpec(BaseModel):
             return cls.model_validate(payload)
         except ValidationError as exc:
             raise ValueError(f"Invalid deployment config in {path}:\n{exc}") from exc
+
+
+def print_deployment_header(spec: DeploymentSpec) -> None:
+    CONSOLE.print("[blue]──[/blue]")
+    CONSOLE.print(f"Deployment: [bold]{spec.name}[/bold]")
+    CONSOLE.print(f"[dim]Flow:[/dim] {spec.function}")
+    CONSOLE.print(f"[dim]Image:[/dim] {spec.image_key}")
 
 
 def load_deployments(config_dir: Path) -> list[DeploymentSpec]:
