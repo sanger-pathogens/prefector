@@ -22,8 +22,16 @@ class DeploymentDeployOptions:
     dry_run: bool
 
 
+@dataclass
+class RunOptions:
+    deployment_name: str | None
+    tags: tuple[str, ...]
+    watch: bool
+
+
 _OPTION_KEYS = {f.name for f in DeploymentOptions.__dataclass_fields__.values()}
 _DEPLOY_OPTION_KEYS = {f.name for f in DeploymentDeployOptions.__dataclass_fields__.values()}
+_RUN_OPTION_KEYS = {f.name for f in RunOptions.__dataclass_fields__.values()}
 
 
 def deployment_options(f):
@@ -62,5 +70,18 @@ def deployment_deploy_options(f):
     def wrapper(*args, **kwargs):
         deployment_deploy_opts = DeploymentDeployOptions(**{k: kwargs.pop(k) for k in _DEPLOY_OPTION_KEYS})
         return f(*args, deployment_deploy_opts=deployment_deploy_opts, **kwargs)
+
+    return wrapper
+
+
+def run_options(f):
+    @click.argument("deployment_name", required=False, default=None)
+    @optgroup.group("Run")
+    @optgroup.option("--tag", "tags", help="Run all deployments with this tag (repeatable).", multiple=True)
+    @optgroup.option("--watch", help="Wait for all flow runs to complete.", is_flag=True, default=False)
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        run_opts = RunOptions(**{k: kwargs.pop(k) for k in _RUN_OPTION_KEYS})
+        return f(*args, run_opts=run_opts, **kwargs)
 
     return wrapper

@@ -1,4 +1,5 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
+from uuid import UUID, uuid4
 
 import anyio
 import click
@@ -7,6 +8,9 @@ import pytest
 from click.testing import CliRunner
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
+from prefect.client.schemas.objects import Flow as FlowSchema
+from prefect.client.schemas.objects import FlowRun, State, StateType
+from prefect.client.schemas.responses import DeploymentResponse
 from prefect.exceptions import ObjectNotFound
 
 import prefector.deployments.deploy as deploy_cmd
@@ -150,17 +154,26 @@ def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
         )
 
 
-def test_deployment_label_with_flow_name():
-    d = MagicMock()
-    d.flow_name = "my-flow"
-    d.name = "my-deployment"
-    assert run_cmd._deployment_label(d) == "my-flow/my-deployment"
+def _make_deployment(name: str, flow_id: UUID | None = None) -> DeploymentResponse:
+    return DeploymentResponse(name=name, flow_id=flow_id or uuid4())
 
 
-def test_deployment_label_falls_back_to_name():
-    d = MagicMock(spec=["name"])
-    d.name = "my-deployment"
-    assert run_cmd._deployment_label(d) == "my-deployment"
+def test_deployment_label_formats_flow_and_deployment_name():
+    d = _make_deployment("my-deployment")
+    assert run_cmd._deployment_label("my-flow", d) == "my-flow/my-deployment"
+
+
+def test_flow_names_by_id_batches_lookup_by_flow_id():
+    flow = FlowSchema(name="my-flow")
+    d = _make_deployment("my-deployment", flow_id=flow.id)
+    client = AsyncMock()
+    client.read_flows.return_value = [flow]
+
+    result = anyio.run(run_cmd._flow_names_by_id, client, [d])
+
+    assert result == {flow.id: "my-flow"}
+    requested_ids = client.read_flows.call_args.kwargs["flow_filter"].id.any_
+    assert requested_ids == [flow.id]
 
 
 def _object_not_found():
@@ -170,7 +183,7 @@ def _object_not_found():
 
 
 def test_find_deployments_by_slash_name_returns_single():
-    mock_deployment = MagicMock()
+    mock_deployment = _make_deployment("my-deployment")
     client = AsyncMock()
     client.read_deployment_by_name.return_value = mock_deployment
 
@@ -189,7 +202,7 @@ def test_find_deployments_raises_for_not_found_slash_name():
 
 
 def test_find_deployments_by_bare_name_returns_all_matches():
-    d1, d2 = MagicMock(), MagicMock()
+    d1, d2 = _make_deployment("deploy-a"), _make_deployment("deploy-b")
     client = AsyncMock()
     client.read_deployments.return_value = [d1, d2]
 
@@ -207,18 +220,18 @@ def test_find_deployments_raises_when_no_match():
 
 
 def test_find_deployments_lists_available_in_error():
-    available = MagicMock()
-    available.flow_name = "some-flow"
-    available.name = "other-deployment"
+    flow = FlowSchema(name="some-flow")
+    available = _make_deployment("other-deployment", flow_id=flow.id)
     client = AsyncMock()
     client.read_deployments.side_effect = [[], [available]]
+    client.read_flows.return_value = [flow]
 
     with pytest.raises(ValueError, match="some-flow/other-deployment"):
         anyio.run(run_cmd._find_deployments, client, "foo")
 
 
 def test_find_deployments_by_tags_returns_matches():
-    d = MagicMock()
+    d = _make_deployment("my-deployment")
     client = AsyncMock()
     client.read_deployments.return_value = [d]
 
@@ -235,59 +248,50 @@ def test_find_deployments_by_tags_raises_when_no_match():
         anyio.run(run_cmd._find_deployments_by_tags, client, ["nightly", "prod"])
 
 
-def _make_flow_run(run_id: str, final: bool, completed: bool = True, state_name: str = "Completed"):
-    flow_run = MagicMock()
-    flow_run.id = run_id
-    flow_run.state = MagicMock()
-    flow_run.state.is_final.return_value = final
-    flow_run.state.is_completed.return_value = completed
-    flow_run.state.name = state_name
-    return flow_run
-
-
-def _fake_prefect(states_by_run_id: dict[str, list]):
-    """Fakes `_prefect` by dispatching `read_flow_run(rid)` to per-run-id state sequences.
-
-    Unlike a plain call-order iterator, this only returns the right flow run for the
-    `rid` actually requested, so it stays correct regardless of polling order.
-    """
-    remaining = {run_id: iter(states) for run_id, states in states_by_run_id.items()}
-
-    class _FakeClient:
-        def read_flow_run(self, rid):
-            return next(remaining[rid])
-
-    return lambda fn: fn(_FakeClient())
+def _make_flow_run(
+    *, flow_run_id: UUID | None = None, final: bool, completed: bool = True, state_name: str = "Completed"
+) -> FlowRun:
+    if not final:
+        state_type = StateType.RUNNING
+    elif completed:
+        state_type = StateType.COMPLETED
+    else:
+        state_type = StateType.FAILED
+    return FlowRun(id=flow_run_id or uuid4(), flow_id=uuid4(), state=State(type=state_type, name=state_name))
 
 
 def test_watch_flow_runs_polls_until_all_final(monkeypatch):
-    pending = _make_flow_run("run-1", final=False)
-    completed = _make_flow_run("run-1", final=True, completed=True)
-    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [pending, completed]}))
-    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
+    run_id = uuid4()
+    pending = _make_flow_run(flow_run_id=run_id, final=False)
+    completed = _make_flow_run(flow_run_id=run_id, final=True, completed=True)
+    client = AsyncMock()
+    client.read_flow_runs.side_effect = [[pending], [completed]]
+    monkeypatch.setattr(run_cmd.anyio, "sleep", AsyncMock())
 
-    run_cmd._watch_flow_runs([("my-flow/my-deployment", pending)])
+    anyio.run(run_cmd._watch_flow_runs, client, [("my-flow/my-deployment", pending)])
 
 
 def test_watch_flow_runs_raises_when_any_failed(monkeypatch):
-    ok = _make_flow_run("run-1", final=True, completed=True)
-    failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
-    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [ok], "run-2": [failed]}))
-    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
+    ok = _make_flow_run(final=True, completed=True)
+    failed = _make_flow_run(final=True, completed=False, state_name="Failed")
+    client = AsyncMock()
+    client.read_flow_runs.return_value = [ok, failed]
+    monkeypatch.setattr(run_cmd.anyio, "sleep", AsyncMock())
 
     with pytest.raises(click.ClickException, match="orchestrator-b"):
-        run_cmd._watch_flow_runs([("orchestrator-a", ok), ("orchestrator-b", failed)])
+        anyio.run(run_cmd._watch_flow_runs, client, [("orchestrator-a", ok), ("orchestrator-b", failed)])
 
 
 def test_watch_flow_runs_waits_for_all_before_raising(monkeypatch):
     """All runs are triggered and polled before the error is raised."""
-    ok = _make_flow_run("run-1", final=True, completed=True)
-    failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
-    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [ok], "run-2": [failed]}))
-    monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
+    ok = _make_flow_run(final=True, completed=True)
+    failed = _make_flow_run(final=True, completed=False, state_name="Failed")
+    client = AsyncMock()
+    client.read_flow_runs.return_value = [ok, failed]
+    monkeypatch.setattr(run_cmd.anyio, "sleep", AsyncMock())
 
     with pytest.raises(click.ClickException, match="did not complete"):
-        run_cmd._watch_flow_runs([("a", ok), ("b", failed)])
+        anyio.run(run_cmd._watch_flow_runs, client, [("a", ok), ("b", failed)])
 
 
 def test_run_flow_requires_name_or_tag(base_args):
@@ -325,7 +329,8 @@ def test_run_flow_triggers_deployment_end_to_end(
     result = CliRunner().invoke(cli, ["deployments", "run", spec.name] + base_args)
 
     assert result.exit_code == 0, result.output
-    assert f"Triggering {spec.name}" in result.output
+    assert "Triggering" in result.output
+    assert f"/{spec.name}" in result.output
     assert "/runs/flow-run/" in result.output
 
     with get_client(sync_client=True) as client:
