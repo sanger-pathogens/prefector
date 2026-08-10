@@ -3,7 +3,11 @@ from pydantic import Field, create_model
 from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings
 
-from prefector.blocks.sources.common import apply_nested_fields, field_definitions_for_block
+from prefector.blocks.sources.common import (
+    apply_nested_fields,
+    field_definitions_for_block,
+    split_nested_field_aliases,
+)
 
 
 class _Block(Block):
@@ -102,3 +106,27 @@ def test_apply_nested_fields_skips_when_field_already_non_dict():
     d = {"parent": "already-a-plain-value"}
     apply_nested_fields(d, {"parent.child": "some-key"}, {"some-key": "value"}.get)
     assert d == {"parent": "already-a-plain-value"}
+
+
+def test_split_nested_field_aliases_separates_flat_from_dotted():
+    flat, nested = split_nested_field_aliases({"user": "login", "aws_client_parameters.endpoint_url": "hostname"})
+    assert flat == {"user": "login"}
+    assert nested == {"aws_client_parameters.endpoint_url": "hostname"}
+
+
+def test_split_nested_field_aliases_handles_none():
+    flat, nested = split_nested_field_aliases(None)
+    assert flat == {}
+    assert nested == {}
+
+
+def test_split_nested_field_aliases_all_flat():
+    flat, nested = split_nested_field_aliases({"a": "1", "b": "2"})
+    assert flat == {"a": "1", "b": "2"}
+    assert nested == {}
+
+
+def test_split_nested_field_aliases_all_dotted():
+    flat, nested = split_nested_field_aliases({"a.b": "1", "c.d": "2"})
+    assert flat == {}
+    assert nested == {"a.b": "1", "c.d": "2"}

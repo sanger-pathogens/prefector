@@ -29,6 +29,25 @@ def apply_nested_fields(d: dict[str, Any], nested_fields: dict[str, str], lookup
             nested[subfield_name] = value
 
 
+def split_nested_field_aliases(field_aliases: Optional[dict[str, str]]) -> tuple[dict[str, str], dict[str, str]]:
+    """Split a `field_aliases` dict into flat aliases and dotted `nested_fields` entries.
+
+    A dotted key (`"<field>.<subfield>"`) can never be an actual field name, so it
+    unambiguously marks a `nested_fields` entry rather than a flat rename.
+
+    Args:
+        field_aliases: A mapping that may contain both flat (`"field"`) and dotted
+            (`"field.subfield"`) keys.
+
+    Returns:
+        A `(flat_aliases, nested_fields)` tuple, each a plain `dict[str, str]`.
+    """
+    field_aliases = field_aliases or {}
+    flat = {k: v for k, v in field_aliases.items() if "." not in k}
+    nested = {k: v for k, v in field_aliases.items() if "." in k}
+    return flat, nested
+
+
 def field_definitions_for_block(
     block_cls,
     field_types: Optional[dict[str, type[Any]]] = None,

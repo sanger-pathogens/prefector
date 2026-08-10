@@ -71,7 +71,7 @@ passes the resolved values to the block.
 
 ### Sourcing from the environment
 
-`env_settings_model_for_block(block_cls, *, env_prefix="", field_types=None, field_aliases=None, nested_fields=None)`
+`env_settings_model_for_block(block_cls, *, env_prefix="", field_types=None, field_aliases=None)`
 builds a settings class that reads each field from `<env_prefix><FIELD_NAME>`:
 
 ```python
@@ -93,24 +93,26 @@ settings_cls = env_settings_model_for_block(
 )
 ```
 
-For a field that is itself a nested model — for example Prefect's built-in
-`AwsCredentials.aws_client_parameters.endpoint_url` — map each sub-field to a
-full env var name with `nested_fields`:
+A dotted key (`"<field>.<subfield>"`) populates one sub-field of a nested model
+field instead — for example Prefect's built-in
+`AwsCredentials.aws_client_parameters.endpoint_url` — since a plain field name
+can never contain a `.`, this is unambiguous and can be mixed freely with flat
+renames in the same dict:
 
 ```python
 settings_cls = env_settings_model_for_block(
     AwsCredentials,
     env_prefix="AWS_",
-    nested_fields={"aws_client_parameters.endpoint_url": "AWS_HOSTNAME"},
+    field_aliases={"aws_client_parameters.endpoint_url": "AWS_HOSTNAME"},
 )
 ```
 
 Only the mapped sub-fields are set; any sub-field of `aws_client_parameters`
-not listed in `nested_fields` keeps its own default.
+not listed keeps its own default.
 
 ### Sourcing from Keeper Secrets Manager
 
-`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None, field_aliases=None, nested_fields=None)`
+`keeper_settings_model_for_block(block_cls, *, record_title, record_prefix="", record_suffix="", separator=":", ksm_token=None, field_types=None, field_aliases=None)`
 builds a settings class that reads each field from a Keeper record instead:
 
 ```python
@@ -171,16 +173,16 @@ class TrinoBlock(DatabaseCredentials):
 ```
 
 `KeeperSettingsSource` only matches top-level fields by name/alias — it can't
-reach into a nested model's sub-fields on its own. For a sub-field that needs a
-value from this record (for example Prefect's built-in
-`AwsCredentials.aws_client_parameters.endpoint_url`), map it explicitly with
-`nested_fields`:
+reach into a nested model's sub-fields on its own. A dotted `field_aliases` key
+(`"<field>.<subfield>"`) reaches one sub-field instead — since a plain field
+name can never contain a `.`, this is unambiguous and can be mixed freely with
+flat renames in the same dict:
 
 ```python
 settings_cls = keeper_settings_model_for_block(
     AwsCredentials,
     record_title="aws-credentials",
-    nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+    field_aliases={"aws_client_parameters.endpoint_url": "hostname"},
 )
 ```
 

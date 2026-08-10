@@ -4,7 +4,11 @@ from typing import Any, Optional
 from pydantic import BaseModel, create_model
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
-from prefector.blocks.sources.common import apply_nested_fields, field_definitions_for_block
+from prefector.blocks.sources.common import (
+    apply_nested_fields,
+    field_definitions_for_block,
+    split_nested_field_aliases,
+)
 
 
 class _NestedFieldsEnvSource(PydanticBaseSettingsSource):
@@ -21,13 +25,12 @@ class _NestedFieldsEnvSource(PydanticBaseSettingsSource):
         return d
 
 
-def env_settings_model_for_block(  # noqa: PLR0913
+def env_settings_model_for_block(
     block_cls: type[BaseModel],
     *,
     env_prefix: str = "",
     field_types: Optional[dict[str, type[Any]]] = None,
     field_aliases: Optional[dict[str, str]] = None,
-    nested_fields: Optional[dict[str, str]] = None,
 ) -> type[BaseSettings]:
     """Build a `BaseSettings` class from a Block's fields, sourced from the environment.
 
@@ -41,14 +44,14 @@ def env_settings_model_for_block(  # noqa: PLR0913
             settings model).
         field_aliases: Reads a field from a specific full env var name (bypassing
             `env_prefix`), without requiring a Block subclass just to rename a field —
-            useful for third-party blocks you don't want to modify.
-        nested_fields: Maps a dotted `"<field>.<subfield>"` path to a full env var name,
-            for populating one sub-field of a nested model field (for example, Prefect's
-            `AwsCredentials.aws_client_parameters.endpoint_url`).
+            useful for third-party blocks you don't want to modify. A dotted key
+            (`"<field>.<subfield>"`) populates one sub-field of a nested model field
+            instead (for example, Prefect's `AwsCredentials.aws_client_parameters.endpoint_url`).
 
     Returns:
         A `BaseSettings` subclass ready to be instantiated, e.g. as a `BlockSpec.settings_cls`.
     """
+    field_aliases, nested_fields = split_nested_field_aliases(field_aliases)
     definitions = field_definitions_for_block(block_cls, field_types, field_aliases)
 
     settings_cls = create_model(

@@ -193,7 +193,7 @@ class _AwsCredsBlock(Block):
     aws_client_parameters: _ClientParameters = Field(default_factory=_ClientParameters)
 
 
-def test_keeper_settings_model_for_block_populates_nested_subfield():
+def test_keeper_settings_model_for_block_dotted_field_alias_populates_nested_subfield():
     record = _make_keeper_record(custom={"access_key": "AKIA...", "hostname": "minio.local:9000"})
     mock_sm = MagicMock()
     mock_sm.get_secret_by_title.return_value = record
@@ -202,7 +202,7 @@ def test_keeper_settings_model_for_block_populates_nested_subfield():
         _AwsCredsBlock,
         record_title="aws-credentials",
         ksm_token="dummy-token",
-        nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+        field_aliases={"aws_client_parameters.endpoint_url": "hostname"},
     )
     with _mock_keeper_sdk(mock_sm):
         settings = settings_cls()
@@ -212,7 +212,7 @@ def test_keeper_settings_model_for_block_populates_nested_subfield():
     assert settings.aws_client_parameters.api_version is None  # untouched, keeps its own default
 
 
-def test_keeper_settings_model_for_block_nested_subfield_missing_from_record_keeps_default():
+def test_keeper_settings_model_for_block_dotted_field_alias_missing_from_record_keeps_default():
     record = _make_keeper_record(custom={"access_key": "AKIA..."})
     mock_sm = MagicMock()
     mock_sm.get_secret_by_title.return_value = record
@@ -221,7 +221,7 @@ def test_keeper_settings_model_for_block_nested_subfield_missing_from_record_kee
         _AwsCredsBlock,
         record_title="aws-credentials",
         ksm_token="dummy-token",
-        nested_fields={"aws_client_parameters.endpoint_url": "hostname"},
+        field_aliases={"aws_client_parameters.endpoint_url": "hostname"},
     )
     with _mock_keeper_sdk(mock_sm):
         settings = settings_cls()
@@ -251,6 +251,31 @@ def test_keeper_settings_model_for_block_field_aliases_renames_without_block_sub
 
     assert settings.aws_access_key_id == "AKIA..."
     assert settings.aws_secret_access_key == "s3cr3t"
+
+
+def test_keeper_settings_model_for_block_field_aliases_mixes_flat_and_dotted_keys():
+    class _ThirdPartyBlock(Block):
+        aws_access_key_id: str
+        aws_client_parameters: _ClientParameters = Field(default_factory=_ClientParameters)
+
+    record = _make_keeper_record(custom={"access_key": "AKIA...", "hostname": "minio.local:9000"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    settings_cls = keeper_settings_model_for_block(
+        _ThirdPartyBlock,
+        record_title="aws-credentials",
+        ksm_token="dummy-token",
+        field_aliases={
+            "aws_access_key_id": "access_key",
+            "aws_client_parameters.endpoint_url": "hostname",
+        },
+    )
+    with _mock_keeper_sdk(mock_sm):
+        settings = settings_cls()
+
+    assert settings.aws_access_key_id == "AKIA..."
+    assert settings.aws_client_parameters.endpoint_url == "minio.local:9000"
 
 
 def test_keeper_settings_model_for_block_preserves_default_factory():
