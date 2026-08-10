@@ -13,6 +13,7 @@ class PrefectConnectionArgs:
     ssl_cert: Path | None
     api_auth_string: str | None
     keycloak_token_url: str | None
+    keycloak_scope: str
     keycloak_username: str | None
     keycloak_password: str | None
     keycloak_direct_grant_client_id: str
@@ -34,6 +35,12 @@ def prefect_connection_options(f):
         "--ssl-cert", type=click.Path(path_type=Path), envvar="SSL_CERT_FILE", help="Or set SSL_CERT_FILE."
     )
     @optgroup.option("--keycloak-token-url", help="Keycloak token URL. Provide only when using Keycloak auth.")
+    @optgroup.option(
+        "--keycloak-scope",
+        default="openid profile email",
+        show_default=True,
+        help="Keycloak scope. Provide only when using Keycloak auth.",
+    )
     @optgroup.group("Basic Prefect Auth")
     @optgroup.option("--api-auth-string", envvar="PREFECT_API_AUTH_STRING")
     @optgroup.group("Keycloak Operator Auth")

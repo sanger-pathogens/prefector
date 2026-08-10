@@ -29,6 +29,7 @@ def connection_defaults():
         "ssl_cert": None,
         "api_auth_string": None,
         "keycloak_token_url": None,
+        "keycloak_scope": "openid profile email",
         "keycloak_username": None,
         "keycloak_password": None,
         "keycloak_direct_grant_client_id": "prefect-cli",

@@ -38,6 +38,7 @@ def prefect_args_defaults():
         "ssl_cert": None,
         "api_auth_string": None,
         "keycloak_token_url": None,
+        "keycloak_scope": "openid profile email",
         "keycloak_username": None,
         "keycloak_password": None,
         "keycloak_direct_grant_client_id": "prefect-cli",
@@ -158,6 +159,26 @@ def test_generate_prefect_settings_operator_keycloak(monkeypatch, build_connecti
     assert captured["ssl_cert"] is None
     assert json.loads(settings[PREFECT_CLIENT_CUSTOM_HEADERS]) == {"Authorization": "Bearer op-token"}
     assert PREFECT_API_AUTH_STRING not in settings
+
+
+def test_generate_prefect_settings_operator_keycloak_custom_scope(monkeypatch, build_connection):
+    captured = {}
+
+    def _token(*, token_url, form_data, ssl_cert):
+        captured["form_data"] = form_data
+        return "op-token"
+
+    monkeypatch.setattr(pc, "exchange_keycloak_token", _token)
+    pc.generate_prefect_settings(
+        build_connection(
+            keycloak_token_url="https://keycloak/token",
+            keycloak_username="test_user",
+            keycloak_password="secret",
+            keycloak_scope="openid",
+        )
+    )
+
+    assert captured["form_data"]["scope"] == "openid"
 
 
 def test_generate_prefect_settings_client_credentials_keycloak(monkeypatch, build_connection):

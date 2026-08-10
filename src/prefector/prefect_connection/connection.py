@@ -39,7 +39,7 @@ def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str
             "client_id": args.keycloak_direct_grant_client_id,
             "username": args.keycloak_username,
             "password": args.keycloak_password,
-            "scope": "openid profile email",
+            "scope": args.keycloak_scope,
         }
 
     if mode == "client":
