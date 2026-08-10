@@ -296,3 +296,48 @@ def test_run_flow_rejects_name_and_tag(base_args):
     result = CliRunner().invoke(cli, ["deployments", "run", "my-deployment", "--tag", "nightly"] + base_args)
     assert result.exit_code != 0
     assert "not both" in result.output
+
+
+def test_run_flow_triggers_deployment_end_to_end(
+    monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir, base_args
+):
+    pool_name = "test-pool-run"
+
+    with get_client(sync_client=True) as client:
+        client.create_work_pool(
+            WorkPoolCreate(
+                name=pool_name,
+                base_job_template={
+                    "job_configuration": {"image": "{{ image }}"},
+                    "variables": {"type": "object", "properties": {"image": {"title": "Image", "type": "string"}}},
+                },
+            ),
+            overwrite=True,
+        )
+
+    spec = DeploymentSpec(**deployment_spec_dict)
+    monkeypatch.chdir(deployment_flow_dir)
+    deploy_cmd.deploy_target(
+        spec=spec,
+        work_pool_name=pool_name,
+        work_queue_name=None,
+        image="test-registry/icddrb-redcap:test",
+        dry_run=False,
+    )
+
+    # The test harness already points at the ephemeral test API; avoid letting the CLI's
+    # own --api-url (required, but irrelevant here) override those settings.
+    monkeypatch.setattr(run_cmd, "generate_prefect_settings", lambda _connection: {})
+
+    result = CliRunner().invoke(cli, ["deployments", "run", spec.name] + base_args)
+
+    assert result.exit_code == 0, result.output
+    assert f"Triggering {spec.name}" in result.output
+    assert "/runs/flow-run/" in result.output
+
+    with get_client(sync_client=True) as client:
+        deployments = client.read_deployments()
+        flow_runs = client.read_flow_runs()
+
+    assert len(flow_runs) == 1
+    assert flow_runs[0].deployment_id == deployments[0].id
