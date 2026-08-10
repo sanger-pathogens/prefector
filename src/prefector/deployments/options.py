@@ -31,8 +31,8 @@ def deployment_options(f):
     @optgroup.option(
         "--deployments-dir",
         type=click.Path(exists=True, file_okay=False, path_type=Path),
-        default=".",
         help="Directory containing deployment YAML.",
+        required=True,
     )
     @functools.wraps(f)
     def wrapper(*args, **kwargs):
@@ -51,6 +51,7 @@ def deployment_deploy_options(f):
         "--images-manifest",
         type=click.Path(path_type=Path, dir_okay=False, exists=True),
         help="Path to images manifest.",
+        required=True,
     )
     @optgroup.option("--image-prefix", help="Image prefix/registry, e.g. ghcr.io/org.", required=True)
     @optgroup.option("--image-tag", help="Image tag for deployment.", default="latest", show_default=True)

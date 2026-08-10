@@ -20,8 +20,8 @@ def block_options(f):
     @optgroup.option(
         "--blocks-dir",
         type=click.Path(exists=True, file_okay=False, path_type=Path),
-        default=".",
         help="Directory containing blocks.",
+        required=True,
     )
     @optgroup.option("--target", help="Target blocks to list/deploy", multiple=True)
     @functools.wraps(f)

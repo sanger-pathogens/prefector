@@ -95,6 +95,7 @@ def deploy_target(  # noqa: PLR0913
     kwargs: dict[str, Any] = {
         "name": spec.name,
         "work_pool_name": work_pool_name,
+        "work_queue_name": work_queue_name,
         "image": image,
         "build": False,
         "push": False,
@@ -103,8 +104,6 @@ def deploy_target(  # noqa: PLR0913
         "entrypoint_type": EntrypointType.MODULE_PATH,
     }
 
-    if work_queue_name is not None:
-        kwargs["work_queue_name"] = work_queue_name
     if spec.tags:
         kwargs["tags"] = spec.tags
     if spec.parameters:
