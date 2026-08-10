@@ -54,12 +54,12 @@ def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str
     raise click.UsageError(f"Unknown auth mode: {mode}")
 
 
-def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_cert: Path = None) -> str:
+def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_cert: Path | None = None) -> str:
     response = requests.post(
         token_url,
         data=form_data,
         timeout=30,
-        verify=ssl_cert,
+        verify=str(ssl_cert) if ssl_cert else None,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
 
@@ -83,7 +83,7 @@ def set_bearer_token(token: str):
 
 
 def generate_prefect_settings(args: PrefectConnectionArgs) -> dict[Setting, Any]:
-    settings = {
+    settings: dict[Setting, Any] = {
         PREFECT_API_URL: args.api_url,
     }
 

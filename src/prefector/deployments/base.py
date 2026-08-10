@@ -1,4 +1,4 @@
-import importlib
+import importlib.util
 import itertools
 import os
 import re
