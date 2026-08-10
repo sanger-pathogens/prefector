@@ -1,7 +1,6 @@
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import click
 from click import UsageError
@@ -11,14 +10,14 @@ from click_option_group import optgroup
 @dataclass
 class PrefectConnectionArgs:
     api_url: str
-    ssl_cert: Optional[Path]
-    api_auth_string: Optional[str]
-    keycloak_token_url: Optional[str]
-    keycloak_username: Optional[str]
-    keycloak_password: Optional[str]
+    ssl_cert: Path | None
+    api_auth_string: str | None
+    keycloak_token_url: str | None
+    keycloak_username: str | None
+    keycloak_password: str | None
     keycloak_direct_grant_client_id: str
-    keycloak_client_id: Optional[str]
-    keycloak_client_secret: Optional[str]
+    keycloak_client_id: str | None
+    keycloak_client_secret: str | None
 
     def __post_init__(self):
         if not self.api_url.endswith("/api"):

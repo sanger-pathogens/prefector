@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 import requests
@@ -15,7 +15,7 @@ from prefect.settings.legacy import Setting
 from prefector.prefect_connection.options import PrefectConnectionArgs
 
 
-def detect_auth_mode(args: PrefectConnectionArgs) -> Optional[str]:
+def detect_auth_mode(args: PrefectConnectionArgs) -> str | None:
     flags = {
         "api": args.api_auth_string is not None,
         "password": args.keycloak_username is not None or args.keycloak_password is not None,

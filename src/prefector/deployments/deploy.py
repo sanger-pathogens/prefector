@@ -2,7 +2,8 @@ import contextlib
 import importlib
 import io
 import logging
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 import click
 from click import UsageError

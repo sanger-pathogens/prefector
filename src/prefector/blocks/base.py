@@ -2,10 +2,11 @@ import hashlib
 import importlib.util
 import sys
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Annotated, Any, Iterable
+from typing import Annotated, Any
 
 from prefect.blocks.core import Block
 from prefect.exceptions import PrefectException

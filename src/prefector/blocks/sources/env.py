@@ -1,5 +1,5 @@
 import os
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, create_model
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
@@ -29,8 +29,8 @@ def env_settings_model_for_block(
     block_cls: type[BaseModel],
     *,
     env_prefix: str = "",
-    field_types: Optional[dict[str, type[Any]]] = None,
-    field_aliases: Optional[dict[str, str]] = None,
+    field_types: dict[str, type[Any]] | None = None,
+    field_aliases: dict[str, str] | None = None,
 ) -> type[BaseSettings]:
     """Build a `BaseSettings` class from a Block's fields, sourced from the environment.
 

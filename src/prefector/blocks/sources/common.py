@@ -1,4 +1,5 @@
-from typing import Any, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 from pydantic import Field
 
@@ -29,7 +30,7 @@ def apply_nested_fields(d: dict[str, Any], nested_fields: dict[str, str], lookup
             nested[subfield_name] = value
 
 
-def split_nested_field_aliases(field_aliases: Optional[dict[str, str]]) -> tuple[dict[str, str], dict[str, str]]:
+def split_nested_field_aliases(field_aliases: dict[str, str] | None) -> tuple[dict[str, str], dict[str, str]]:
     """Split a `field_aliases` dict into flat aliases and dotted `nested_fields` entries.
 
     A dotted key (`"<field>.<subfield>"`) can never be an actual field name, so it
@@ -50,8 +51,8 @@ def split_nested_field_aliases(field_aliases: Optional[dict[str, str]]) -> tuple
 
 def field_definitions_for_block(
     block_cls,
-    field_types: Optional[dict[str, type[Any]]] = None,
-    field_aliases: Optional[dict[str, str]] = None,
+    field_types: dict[str, type[Any]] | None = None,
+    field_aliases: dict[str, str] | None = None,
 ) -> dict[str, tuple[Any, Any]]:
     """Reflect a Block/pydantic model's fields into `pydantic.create_model` definitions.
 
