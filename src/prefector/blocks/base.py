@@ -8,6 +8,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Annotated, Any
 
+import click
 from prefect.blocks.core import Block
 from prefect.exceptions import PrefectException
 from pydantic import StringConstraints, ValidationError
@@ -196,5 +197,5 @@ def select_targets(selected: Iterable[str], specs: list[BlockSpec]) -> list[Bloc
     missing = sorted(selected - set(index))
     if missing:
         available = ", ".join(sorted(spec.name for spec in specs))
-        raise ValueError(f"Unknown block name(s): {', '.join(missing)}. Available: {available}")
+        raise click.UsageError(f"Unknown block name(s): {', '.join(missing)}. Available: {available}")
     return list(index.values())
