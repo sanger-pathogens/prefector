@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from uuid import UUID
 
 import anyio
@@ -51,8 +52,9 @@ async def _find_deployments(client: PrefectClient, name: str) -> list[Deployment
     return matches
 
 
-async def _find_deployments_by_tags(client: PrefectClient, tags: list[str]) -> list[DeploymentResponse]:
-    matches = await client.read_deployments(deployment_filter=DeploymentFilter(tags=DeploymentFilterTags(all_=tags)))
+async def _find_deployments_by_tags(client: PrefectClient, tags: Sequence[str]) -> list[DeploymentResponse]:
+    deployment_filter = DeploymentFilter(tags=DeploymentFilterTags(all_=list(tags)))
+    matches = await client.read_deployments(deployment_filter=deployment_filter)
     if not matches:
         raise ValueError(f"No deployments found with tags: {', '.join(tags)}")
     return matches
@@ -79,14 +81,12 @@ async def _watch_flow_runs(client: PrefectClient, labeled_runs: list[tuple[str, 
         raise click.ClickException(f"Flow run(s) did not complete: {', '.join(failed)}")
 
 
-async def _run_flow_async(
-    connection: PrefectConnectionArgs, deployment_name: str | None, tags: tuple[str, ...], watch: bool
-) -> None:
+async def _run_flow_async(connection: PrefectConnectionArgs, run_opts: RunOptions) -> None:
     async with get_client() as client:
-        if deployment_name:
-            deployments = await _find_deployments(client, deployment_name)
+        if run_opts.deployment_name:
+            deployments = await _find_deployments(client, run_opts.deployment_name)
         else:
-            deployments = await _find_deployments_by_tags(client, list(tags))
+            deployments = await _find_deployments_by_tags(client, run_opts.tags)
 
         flow_names = await _flow_names_by_id(client, deployments)
 
@@ -99,7 +99,7 @@ async def _run_flow_async(
             CONSOLE.print(f"[green][✓][/green] {ui_base}/runs/flow-run/{flow_run.id}")
             labeled_runs.append((label, flow_run))
 
-        if watch:
+        if run_opts.watch:
             await _watch_flow_runs(client, labeled_runs)
 
 
@@ -117,4 +117,4 @@ def run_flow(connection: PrefectConnectionArgs, run_opts: RunOptions):
         prefect_settings = generate_prefect_settings(connection)
 
         with temporary_settings(updates=prefect_settings):
-            anyio.run(_run_flow_async, connection, run_opts.deployment_name, run_opts.tags, run_opts.watch)
+            anyio.run(_run_flow_async, connection, run_opts)

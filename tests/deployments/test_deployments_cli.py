@@ -176,7 +176,7 @@ def test_flow_names_by_id_batches_lookup_by_flow_id():
     assert requested_ids == [flow.id]
 
 
-def _object_not_found():
+def _object_not_found() -> ObjectNotFound:
     req = httpx.Request("GET", "http://example.com")
     resp = httpx.Response(404, request=req)
     return ObjectNotFound(httpx.HTTPStatusError("404", request=req, response=resp))
