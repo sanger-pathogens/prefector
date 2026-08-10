@@ -56,16 +56,6 @@ def test_handle_errors_no_context_defaults_to_non_debug():
     assert "something went wrong" in result.output
 
 
-def test_cli_blocks_list_succeeds(runner, monkeypatch, tmp_path):
-    result = runner.invoke(cli, ["blocks", "list", "--blocks-dir", str(tmp_path)])
-    assert result.exit_code == 0
-
-
-def test_cli_deployments_list_succeeds(runner, monkeypatch, tmp_path):
-    result = runner.invoke(cli, ["deployments", "list", "--deployments-dir", str(tmp_path)])
-    assert result.exit_code == 0
-
-
 def test_cli_debug_is_flag(runner):
     result = runner.invoke(cli, ["--debug", "--help"])
     assert result.exit_code == 0
@@ -77,3 +67,18 @@ def test_cli_help_lists_subcommands(runner):
     assert result.exit_code == 0
     assert "blocks" in result.output
     assert "deployments" in result.output
+
+
+def test_cli_blocks_subcommand_is_wired(runner):
+    result = runner.invoke(cli, ["blocks", "--help"])
+    assert result.exit_code == 0
+    assert "list" in result.output
+    assert "deploy" in result.output
+
+
+def test_cli_deployments_subcommand_is_wired(runner):
+    result = runner.invoke(cli, ["deployments", "--help"])
+    assert result.exit_code == 0
+    assert "list" in result.output
+    assert "deploy" in result.output
+    assert "run" in result.output

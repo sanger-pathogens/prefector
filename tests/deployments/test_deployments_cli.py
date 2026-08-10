@@ -245,11 +245,25 @@ def _make_flow_run(run_id: str, final: bool, completed: bool = True, state_name:
     return flow_run
 
 
+def _fake_prefect(states_by_run_id: dict[str, list]):
+    """Fakes `_prefect` by dispatching `read_flow_run(rid)` to per-run-id state sequences.
+
+    Unlike a plain call-order iterator, this only returns the right flow run for the
+    `rid` actually requested, so it stays correct regardless of polling order.
+    """
+    remaining = {run_id: iter(states) for run_id, states in states_by_run_id.items()}
+
+    class _FakeClient:
+        def read_flow_run(self, rid):
+            return next(remaining[rid])
+
+    return lambda fn: fn(_FakeClient())
+
+
 def test_watch_flow_runs_polls_until_all_final(monkeypatch):
     pending = _make_flow_run("run-1", final=False)
     completed = _make_flow_run("run-1", final=True, completed=True)
-    calls = iter([pending, completed])
-    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [pending, completed]}))
     monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
     run_cmd._watch_flow_runs([("my-flow/my-deployment", pending)])
@@ -258,8 +272,7 @@ def test_watch_flow_runs_polls_until_all_final(monkeypatch):
 def test_watch_flow_runs_raises_when_any_failed(monkeypatch):
     ok = _make_flow_run("run-1", final=True, completed=True)
     failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
-    calls = iter([ok, failed])
-    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [ok], "run-2": [failed]}))
     monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
     with pytest.raises(click.ClickException, match="orchestrator-b"):
@@ -270,8 +283,7 @@ def test_watch_flow_runs_waits_for_all_before_raising(monkeypatch):
     """All runs are triggered and polled before the error is raised."""
     ok = _make_flow_run("run-1", final=True, completed=True)
     failed = _make_flow_run("run-2", final=True, completed=False, state_name="Failed")
-    calls = iter([ok, failed])
-    monkeypatch.setattr(run_cmd, "_prefect", lambda fn: next(calls))
+    monkeypatch.setattr(run_cmd, "_prefect", _fake_prefect({"run-1": [ok], "run-2": [failed]}))
     monkeypatch.setattr(run_cmd.time, "sleep", lambda _: None)
 
     with pytest.raises(click.ClickException, match="did not complete"):
