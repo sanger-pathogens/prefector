@@ -15,7 +15,7 @@ class DeploymentOptions:
 class DeploymentDeployOptions:
     work_pool: str
     work_queue: str
-    target: tuple[str]
+    target: tuple[str, ...]
     images_manifest: Path
     image_prefix: str
     image_tag: str

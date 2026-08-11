@@ -2,6 +2,7 @@ import os
 from typing import Any
 
 from pydantic import BaseModel, create_model
+from pydantic.fields import FieldInfo
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 from prefector.blocks.sources.common import (
@@ -16,7 +17,7 @@ class _NestedFieldsEnvSource(PydanticBaseSettingsSource):
         super().__init__(settings_cls)
         self._nested_fields = nested_fields
 
-    def get_field_value(self, field, field_name):  # noqa: ARG002
+    def get_field_value(self, field: FieldInfo, field_name: str) -> tuple[Any, str, bool]:  # noqa: ARG002
         return None, field_name, False
 
     def __call__(self) -> dict[str, Any]:

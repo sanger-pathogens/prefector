@@ -39,7 +39,7 @@ class BlockBuildError(ValueError):
         super().__init__(f"Failed to build block '{name}':\n{details_text}")
 
 
-def _loc_to_env_var(settings_cls: type[BaseSettings], loc: tuple[Any, ...]) -> str | None:
+def _loc_to_env_var(settings_cls: type[BaseSettings], loc: tuple[int | str, ...]) -> str | None:
     """Map a Pydantic error location tuple to the corresponding environment variable name.
 
     Only handles top-level fields: nested fields have no single conventional env var name

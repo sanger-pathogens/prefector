@@ -9,7 +9,7 @@ from click_option_group import optgroup
 @dataclass
 class BlockOptions:
     blocks_dir: Path
-    target: tuple[str]
+    target: tuple[str, ...]
 
 
 _OPTION_KEYS = {f.name for f in BlockOptions.__dataclass_fields__.values()}

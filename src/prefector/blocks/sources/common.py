@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 
 def apply_nested_fields(d: dict[str, Any], nested_fields: dict[str, str], lookup: Callable[[str], Any]) -> None:
@@ -50,7 +50,7 @@ def split_nested_field_aliases(field_aliases: dict[str, str] | None) -> tuple[di
 
 
 def field_definitions_for_block(
-    block_cls,
+    block_cls: type[BaseModel],
     field_types: dict[str, type[Any]] | None = None,
     field_aliases: dict[str, str] | None = None,
 ) -> dict[str, tuple[Any, Any]]:

@@ -34,8 +34,8 @@ def _substitute_env_vars(text: str, source: Path) -> str:
     return re.sub(r"\$\{([^}]+)}", replace, text)
 
 
-def _resolve_env_dict(env: dict[str, Any], deployment_name: str) -> dict[str, str]:
-    def resolve_value(value: Any) -> str:
+def _resolve_env_dict(env: dict[str, Any], deployment_name: str) -> dict[str, Any]:
+    def resolve_value(value: Any) -> Any:
         if not isinstance(value, str):
             return value
 

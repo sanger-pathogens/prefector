@@ -78,7 +78,7 @@ def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_ce
     raise ValueError(f"Keycloak token response was invalid: {message}.")
 
 
-def set_bearer_token(token: str):
+def set_bearer_token(token: str) -> str:
     return json.dumps({"Authorization": f"Bearer {token}"})
 
 
@@ -87,7 +87,7 @@ def generate_prefect_settings(args: PrefectConnectionArgs) -> dict[Setting, Any]
         PREFECT_API_URL: args.api_url,
     }
 
-    ssl_cert = getattr(args, "ssl_cert", None)
+    ssl_cert = args.ssl_cert
     if ssl_cert:
         if not ssl_cert.exists():
             raise click.UsageError(f"SSL certificate file does not exist: {ssl_cert}")
