@@ -5,6 +5,7 @@ import anyio
 import click
 import httpx
 import pytest
+import yaml
 from click.testing import CliRunner
 from prefect.client.orchestration import get_client
 from prefect.client.schemas.actions import WorkPoolCreate
@@ -152,6 +153,53 @@ def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
             image="test-registry/icddrb-redcap:test",
             dry_run=False,
         )
+
+
+def test_deploy_triggers_deployment_end_to_end(
+    monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir, tmp_path, base_args
+):
+    pool_name = "test-pool-deploy-cli"
+    _create_work_pool(pool_name)
+
+    deployments_dir = tmp_path / "deployments"
+    deployments_dir.mkdir()
+    (deployments_dir / "deploy-a.yaml").write_text(yaml.dump(deployment_spec_dict), encoding="utf-8")
+
+    images_manifest = tmp_path / "images.yaml"
+    images_manifest.write_text(
+        yaml.dump([{"key": deployment_spec_dict["image_key"], "name": "icddrb-redcap"}]),
+        encoding="utf-8",
+    )
+
+    monkeypatch.chdir(deployment_flow_dir)
+    # Same trick as the run_flow e2e test: the test harness already points at the ephemeral
+    # test API, so avoid letting the CLI's own --api-url (required, but irrelevant here) override it.
+    monkeypatch.setattr(deploy_cmd, "generate_prefect_settings", lambda _connection: {})
+
+    result = CliRunner().invoke(
+        cli,
+        ["deployments", "deploy"]
+        + base_args
+        + [
+            "--deployments-dir",
+            str(deployments_dir),
+            "--images-manifest",
+            str(images_manifest),
+            "--image-prefix",
+            "ghcr.io/example",
+            "--work-pool",
+            pool_name,
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+
+    with get_client(sync_client=True) as client:
+        created_deployments = client.read_deployments()
+
+    assert len(created_deployments) == 1
+    assert created_deployments[0].name == deployment_spec_dict["name"]
+    assert created_deployments[0].job_variables["image"] == "ghcr.io/example/icddrb-redcap:latest"
 
 
 def _make_deployment(name: str, flow_id: UUID | None = None) -> DeploymentResponse:

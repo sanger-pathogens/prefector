@@ -73,6 +73,13 @@ def test_missing_api_url_exits_nonzero(runner, monkeypatch):
     assert "Missing option '--api-url'" in result.output
 
 
+def test_api_url_not_ending_in_api_exits_nonzero(runner, monkeypatch):
+    monkeypatch.delenv("PREFECT_API_URL", raising=False)
+    result = runner.invoke(_cmd, ["--api-url", "http://cli-flag/wrong"])
+    assert result.exit_code != 0
+    assert "Prefect API URLs must end with /api" in result.output
+
+
 def test_api_url_from_cli_flag(runner, monkeypatch):
     monkeypatch.delenv("PREFECT_API_URL", raising=False)
     result = runner.invoke(_cmd, ["--api-url", "http://cli-flag/api"])
