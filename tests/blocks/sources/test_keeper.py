@@ -5,6 +5,7 @@ from prefect.blocks.core import Block
 from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import BaseSettings
 
+from prefector.blocks.base import BlockBuildError, BlockSpec
 from prefector.blocks.sources.keeper import KeeperSettingsSource, keeper_settings_model_for_block
 
 
@@ -314,6 +315,21 @@ def test_keeper_settings_model_for_block_missing_required_field_raises():
     settings_cls = keeper_settings_model_for_block(_CredentialsBlock, record_title="creds", ksm_token="dummy-token")
     with _mock_keeper_sdk(mock_sm), pytest.raises(ValidationError, match="password"):
         settings_cls()
+
+
+def test_keeper_settings_model_for_block_build_error_includes_keeper_hint():
+    record = _make_keeper_record(custom={"username": "alice"})
+    mock_sm = MagicMock()
+    mock_sm.get_secret_by_title.return_value = record
+
+    settings_cls = keeper_settings_model_for_block(_CredentialsBlock, record_title="creds", ksm_token="dummy-token")
+    spec = BlockSpec(name="dummy", settings_cls=settings_cls, block_cls=_CredentialsBlock)
+
+    with (
+        _mock_keeper_sdk(mock_sm),
+        pytest.raises(BlockBuildError, match="Set the 'password' field on Keeper record 'creds'"),
+    ):
+        spec.build()
 
 
 def test_keeper_settings_model_for_block_missing_record_raises():

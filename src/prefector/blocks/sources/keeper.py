@@ -13,6 +13,10 @@ from prefector.blocks.sources.common import (
 )
 
 
+def _assemble_record_title(record_prefix: str, record_title: str, record_suffix: str, separator: str) -> str:
+    return separator.join(part for part in (record_prefix, record_title, record_suffix) if part)
+
+
 def keeper_settings_model_for_block(  # noqa: PLR0913
     block_cls: type[BaseModel],
     *,
@@ -73,6 +77,18 @@ def keeper_settings_model_for_block(  # noqa: PLR0913
         )
 
     settings_cls.settings_customise_sources = classmethod(_settings_customise_sources)
+
+    full_record_title = _assemble_record_title(record_prefix, record_title, record_suffix, separator)
+
+    def _loc_hint(cls: type[BaseSettings], loc: tuple[int | str, ...]) -> str | None:
+        if len(loc) != 1 or not isinstance(loc[0], str):
+            return None
+        head = loc[0]
+        field = cls.model_fields.get(head)
+        key = field.validation_alias if field is not None and isinstance(field.validation_alias, str) else head
+        return f"the '{key}' field on Keeper record '{full_record_title}'"
+
+    settings_cls.loc_hint = classmethod(_loc_hint)
     return settings_cls
 
 
@@ -141,7 +157,7 @@ class KeeperSettingsSource(PydanticBaseSettingsSource):
                 field name.
         """
         super().__init__(settings_cls)
-        self._record_title = separator.join(part for part in (record_prefix, record_title, record_suffix) if part)
+        self._record_title = _assemble_record_title(record_prefix, record_title, record_suffix, separator)
         self._ksm_token = ksm_token
         self._nested_fields = nested_fields or {}
 

@@ -29,9 +29,9 @@ class BlockBuildError(ValueError):
             loc = error.get("loc", ())
             field = ".".join(str(part) for part in loc) if loc else "unknown"
             message = error.get("msg", "Invalid value")
-            env_var = _loc_to_env_var(settings_cls, loc)
-            if env_var:
-                details.append(f"{field}: {message}. Set {env_var}")
+            hint = _hint_for_loc(settings_cls, loc)
+            if hint:
+                details.append(f"{field}: {message}. Set {hint}")
             else:
                 details.append(f"{field}: {message}")
 
@@ -39,7 +39,22 @@ class BlockBuildError(ValueError):
         super().__init__(f"Failed to build block '{name}':\n{details_text}")
 
 
-def _loc_to_env_var(settings_cls: type[BaseSettings], loc: tuple[int | str, ...]) -> str | None:
+def _hint_for_loc(settings_cls: type[BaseSettings], loc: tuple[int | str, ...]) -> str | None:
+    """Suggest where to set a field that failed validation.
+
+    Settings sources can attach a `loc_hint` classmethod to their generated class (see
+    `keeper_settings_model_for_block`) to point at something source-specific, like a Keeper
+    record field. Falls back to `_env_prefix_hint` otherwise, which covers both
+    `env_settings_model_for_block` output and hand-written `BaseSettings` subclasses that set
+    `env_prefix` directly.
+    """
+    loc_hint = getattr(settings_cls, "loc_hint", None)
+    if loc_hint is not None:
+        return loc_hint(loc)
+    return _env_prefix_hint(settings_cls, loc)
+
+
+def _env_prefix_hint(settings_cls: type[BaseSettings], loc: tuple[int | str, ...]) -> str | None:
     """Map a Pydantic error location tuple to the corresponding environment variable name.
 
     Only handles top-level fields: nested fields have no single conventional env var name
