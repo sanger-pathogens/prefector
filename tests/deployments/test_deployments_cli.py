@@ -142,6 +142,32 @@ def test_deploy_target_applies_concurrency_options(
     assert created.concurrency_options.collision_strategy == "CANCEL_NEW"
 
 
+def test_deploy_target_applies_version_and_description(
+    monkeypatch, prefect_test_fixture, deployment_spec_dict, deployment_flow_dir
+):
+    pool_name = "test-pool-version"
+    _create_work_pool(pool_name)
+
+    spec = DeploymentSpec(**(deployment_spec_dict | {"version": "1.2.0", "description": "Loads records"}))
+
+    monkeypatch.chdir(deployment_flow_dir)
+
+    deploy_cmd.deploy_target(
+        spec=spec,
+        work_pool_name=pool_name,
+        work_queue_name=None,
+        image="test-registry/icddrb-redcap:test",
+        dry_run=False,
+    )
+
+    with get_client(sync_client=True) as client:
+        deployments = client.read_deployments()
+
+    created = deployments[0]
+    assert created.version == "1.2.0"
+    assert created.description == "Loads records"
+
+
 def test_deploy_target_raises_for_invalid_parameters(deployment_spec_dict):
     spec = DeploymentSpec(**(deployment_spec_dict | {"parameters": {"retries": "three"}}))
 

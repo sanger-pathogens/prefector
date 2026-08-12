@@ -87,6 +87,8 @@ class DeploymentSpec(BaseModel):
     env: dict[str, Any] = Field(default_factory=dict)
     concurrency_limit: Annotated[int, Field(gt=0)] | None = None
     collision_strategy: Literal["ENQUEUE", "CANCEL_NEW"] | None = None
+    version: NonEmptyStr | None = None
+    description: NonEmptyStr | None = None
 
     def __str__(self) -> str:
         return f"{self.name}\n  flow: {self.flow}\n  image_key: {self.image_key}"

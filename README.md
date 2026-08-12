@@ -214,6 +214,8 @@ env:
   LOG_LEVEL: INFO
 concurrency_limit: 1                # max concurrent flow runs for this deployment
 collision_strategy: CANCEL_NEW      # ENQUEUE (default) or CANCEL_NEW
+version: "1.2.0"                    # free-form version label, shown in the Prefect UI
+description: "Loads records into the bronze layer"
 ```
 
 `collision_strategy` requires `concurrency_limit` to be set, and controls what

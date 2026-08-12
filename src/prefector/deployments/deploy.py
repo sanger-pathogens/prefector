@@ -108,6 +108,10 @@ def deploy_target(  # noqa: PLR0913
         kwargs["tags"] = spec.tags
     if spec.parameters:
         kwargs["parameters"] = spec.parameters
+    if spec.version:
+        kwargs["version"] = spec.version
+    if spec.description:
+        kwargs["description"] = spec.description
     if spec.env:
         kwargs["job_variables"]["env"] = _resolve_env_dict(spec.env, spec.name)
     if spec.cron:

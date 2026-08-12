@@ -82,6 +82,20 @@ def test_deployment_spec_rejects_collision_strategy_without_concurrency_limit(de
         DeploymentSpec(**(deployment_spec_dict | {"collision_strategy": "CANCEL_NEW"}))
 
 
+def test_deployment_spec_accepts_version_and_description(deployment_spec_dict):
+    spec = DeploymentSpec(**(deployment_spec_dict | {"version": "1.2.0", "description": "Loads records"}))
+
+    assert spec.version == "1.2.0"
+    assert spec.description == "Loads records"
+
+
+def test_deployment_spec_version_and_description_default_to_none(deployment_spec_dict):
+    spec = DeploymentSpec(**deployment_spec_dict)
+
+    assert spec.version is None
+    assert spec.description is None
+
+
 def test_from_yaml_rejects_empty_file(tmp_path: Path):
     path = tmp_path / "empty.yaml"
     path.write_text("", encoding="utf-8")
