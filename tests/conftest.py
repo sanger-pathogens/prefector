@@ -7,6 +7,8 @@ import pytest
 from prefect.filesystems import LocalFileSystem
 from prefect.testing.utilities import prefect_test_harness
 
+from prefector.prefect_connection.options import PrefectConnectionArgs
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
@@ -86,3 +88,27 @@ def base_args():
     for key in base_args.keys():
         args += [key, base_args[key]]
     return args
+
+
+@pytest.fixture(scope="module")
+def prefect_connection_defaults():
+    return {
+        "api_url": "http://localhost:4200/api",
+        "ssl_cert": None,
+        "api_auth_string": None,
+        "keycloak_token_url": None,
+        "keycloak_scope": "openid profile email",
+        "keycloak_username": None,
+        "keycloak_password": None,
+        "keycloak_direct_grant_client_id": "prefect-cli",
+        "keycloak_client_id": None,
+        "keycloak_client_secret": None,
+    }
+
+
+@pytest.fixture
+def build_connection(prefect_connection_defaults):
+    def _build(**overrides):
+        return PrefectConnectionArgs(**(prefect_connection_defaults | overrides))
+
+    return _build

@@ -1,6 +1,6 @@
 import json
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 import requests
@@ -15,7 +15,7 @@ from prefect.settings.legacy import Setting
 from prefector.prefect_connection.options import PrefectConnectionArgs
 
 
-def detect_auth_mode(args: PrefectConnectionArgs) -> Optional[str]:
+def detect_auth_mode(args: PrefectConnectionArgs) -> str | None:
     flags = {
         "api": args.api_auth_string is not None,
         "password": args.keycloak_username is not None or args.keycloak_password is not None,
@@ -39,7 +39,7 @@ def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str
             "client_id": args.keycloak_direct_grant_client_id,
             "username": args.keycloak_username,
             "password": args.keycloak_password,
-            "scope": "openid profile email",
+            "scope": args.keycloak_scope,
         }
 
     if mode == "client":
@@ -54,12 +54,12 @@ def build_keycloak_form_data(args: PrefectConnectionArgs, mode: str) -> dict[str
     raise click.UsageError(f"Unknown auth mode: {mode}")
 
 
-def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_cert: Path = None) -> str:
+def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_cert: Path | None = None) -> str:
     response = requests.post(
         token_url,
         data=form_data,
         timeout=30,
-        verify=ssl_cert,
+        verify=str(ssl_cert) if ssl_cert else None,
         headers={"Content-Type": "application/x-www-form-urlencoded"},
     )
 
@@ -78,16 +78,16 @@ def exchange_keycloak_token(*, token_url: str, form_data: dict[str, str], ssl_ce
     raise ValueError(f"Keycloak token response was invalid: {message}.")
 
 
-def set_bearer_token(token: str):
+def set_bearer_token(token: str) -> str:
     return json.dumps({"Authorization": f"Bearer {token}"})
 
 
 def generate_prefect_settings(args: PrefectConnectionArgs) -> dict[Setting, Any]:
-    settings = {
+    settings: dict[Setting, Any] = {
         PREFECT_API_URL: args.api_url,
     }
 
-    ssl_cert = getattr(args, "ssl_cert", None)
+    ssl_cert = args.ssl_cert
     if ssl_cert:
         if not ssl_cert.exists():
             raise click.UsageError(f"SSL certificate file does not exist: {ssl_cert}")

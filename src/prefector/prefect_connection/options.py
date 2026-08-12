@@ -1,7 +1,6 @@
 import functools
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import click
 from click import UsageError
@@ -11,14 +10,15 @@ from click_option_group import optgroup
 @dataclass
 class PrefectConnectionArgs:
     api_url: str
-    ssl_cert: Optional[Path]
-    api_auth_string: Optional[str]
-    keycloak_token_url: Optional[str]
-    keycloak_username: Optional[str]
-    keycloak_password: Optional[str]
+    ssl_cert: Path | None
+    api_auth_string: str | None
+    keycloak_token_url: str | None
+    keycloak_scope: str
+    keycloak_username: str | None
+    keycloak_password: str | None
     keycloak_direct_grant_client_id: str
-    keycloak_client_id: Optional[str]
-    keycloak_client_secret: Optional[str]
+    keycloak_client_id: str | None
+    keycloak_client_secret: str | None
 
     def __post_init__(self):
         if not self.api_url.endswith("/api"):
@@ -35,6 +35,12 @@ def prefect_connection_options(f):
         "--ssl-cert", type=click.Path(path_type=Path), envvar="SSL_CERT_FILE", help="Or set SSL_CERT_FILE."
     )
     @optgroup.option("--keycloak-token-url", help="Keycloak token URL. Provide only when using Keycloak auth.")
+    @optgroup.option(
+        "--keycloak-scope",
+        default="openid profile email",
+        show_default=True,
+        help="Keycloak scope. Provide only when using Keycloak auth.",
+    )
     @optgroup.group("Basic Prefect Auth")
     @optgroup.option("--api-auth-string", envvar="PREFECT_API_AUTH_STRING")
     @optgroup.group("Keycloak Operator Auth")

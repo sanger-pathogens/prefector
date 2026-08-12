@@ -1,5 +1,6 @@
 from io import StringIO
 
+import click
 import pytest
 from prefect.blocks.core import Block
 from pydantic_settings import BaseSettings
@@ -36,7 +37,7 @@ def test_select_targets_filters_requested_names():
 
 def test_select_targets_rejects_unknown_name():
     specs = [_spec("a")]
-    with pytest.raises(ValueError, match="Unknown block name\\(s\\): missing"):
+    with pytest.raises(click.UsageError, match="Unknown block name\\(s\\): missing"):
         base.select_targets(["missing"], specs)
 
 
@@ -50,7 +51,7 @@ def test_deploy_block_builds_from_spec_settings(monkeypatch):
 
 def test_print_blocks_uses_block_header(monkeypatch):
     buf = StringIO()
-    monkeypatch.setattr(list_module, "CONSOLE", Console(file=buf, highlight=False))
+    monkeypatch.setattr(base, "CONSOLE", Console(file=buf, highlight=False))
     list_module.print_blocks([_spec("a")])
     out = buf.getvalue()
     assert "a" in out

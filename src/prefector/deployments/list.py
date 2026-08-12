@@ -1,25 +1,15 @@
-from typing import Iterable
+from collections.abc import Iterable
 
 import click
-from rich.console import Console
 
-from prefector.deployments.base import DeploymentSpec, load_deployments
+from prefector.deployments.base import DeploymentSpec, load_deployments, print_deployment_header
 from prefector.deployments.options import DeploymentOptions, deployment_options
 from prefector.errors import handle_errors
-
-CONSOLE = Console()
-
-
-def _print_deployment_header(spec: DeploymentSpec) -> None:
-    CONSOLE.print("[blue]──[/blue]")
-    CONSOLE.print(f"Deployment: [bold]{spec.name}[/bold]")
-    CONSOLE.print(f"[dim]Flow:[/dim] {spec.function}")
-    CONSOLE.print(f"[dim]Image:[/dim] {spec.image_key}")
 
 
 def print_deployments(deployments: Iterable[DeploymentSpec]) -> None:
     for deployment in deployments:
-        _print_deployment_header(deployment)
+        print_deployment_header(deployment)
 
 
 @click.command(name="list")

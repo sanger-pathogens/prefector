@@ -73,7 +73,7 @@ def test_deployment_spec_rejects_non_positive_concurrency_limit(deployment_spec_
 
 
 def test_deployment_spec_rejects_invalid_collision_strategy(deployment_spec_dict):
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="Input should be 'ENQUEUE' or 'CANCEL_NEW'"):
         DeploymentSpec(**(deployment_spec_dict | {"concurrency_limit": 1, "collision_strategy": "REJECT"}))
 
 
