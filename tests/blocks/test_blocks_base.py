@@ -213,15 +213,46 @@ def test_load_blocks_rejects_non_blockspec_entries(tmp_path):
 def test_load_blocks_reports_missing_prefect_collection_dependency(tmp_path):
     (tmp_path / "dummy.py").write_text("import prefect_nonexistent_collection\nBLOCKS = []\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="Install the Prefect collection package: prefect-nonexistent-collection"):
+    with pytest.raises(ValueError, match="install the Prefect collection package: prefect-nonexistent-collection"):
         load_blocks(tmp_path)
 
 
 def test_load_blocks_reports_missing_generic_dependency(tmp_path):
     (tmp_path / "dummy.py").write_text("import totally_nonexistent_module\nBLOCKS = []\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="Install it in the current environment"):
+    with pytest.raises(ValueError) as exc_info:
         load_blocks(tmp_path)
+
+    message = str(exc_info.value)
+    assert "ModuleNotFoundError: No module named 'totally_nonexistent_module'" in message
+    assert "install 'totally_nonexistent_module' in the current environment" in message
+    assert "--debug" in message
+
+
+def test_load_blocks_reports_unimportable_name_without_install_hint(tmp_path):
+    (tmp_path / "dummy.py").write_text("from os import not_a_real_name\nBLOCKS = []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_blocks(tmp_path)
+
+    message = str(exc_info.value)
+    assert "ImportError: cannot import name 'not_a_real_name' from 'os'" in message
+    assert "Hint:" not in message
+    assert isinstance(exc_info.value.__cause__, ImportError)
+
+
+@pytest.mark.parametrize("import_line", ["from _shared import X", "from ._shared import X"])
+def test_load_blocks_reports_local_helper_import_without_install_hint(tmp_path, import_line):
+    (tmp_path / "_shared.py").write_text("X = 1\n", encoding="utf-8")
+    (tmp_path / "dummy.py").write_text(f"{import_line}\nBLOCKS = []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_blocks(tmp_path)
+
+    message = str(exc_info.value)
+    assert "ModuleNotFoundError" in message
+    assert "cannot import other files from the blocks directory" in message
+    assert "Hint: install" not in message
 
 
 def test_load_blocks_reports_import_error_without_module_name(tmp_path):

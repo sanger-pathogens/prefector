@@ -9,4 +9,7 @@ __pycache__/
 venv/
 .venv/
 
+# AI
+.claude
+
 .coverage

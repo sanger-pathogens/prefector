@@ -19,6 +19,8 @@ NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 
 CONSOLE = Console()
 
+EXTERNAL_BLOCKS_PACKAGE = "prefector_external_blocks"
+
 
 class BlockBuildError(ValueError):
     """Raised when block settings validation fails during block construction."""
@@ -129,7 +131,7 @@ def _already_loaded_module(module_name: str, module_path: Path):
 def _load_specs_module(module_path: Path):
     resolved_path = module_path.resolve()
     namespace = hashlib.sha256(str(resolved_path.parent).encode("utf-8")).hexdigest()[:12]
-    module_name = f"prefector_external_blocks.{namespace}.{module_path.stem}"
+    module_name = f"{EXTERNAL_BLOCKS_PACKAGE}.{namespace}.{module_path.stem}"
     existing = _already_loaded_module(module_name, module_path)
     if existing is not None:
         return existing
@@ -137,15 +139,15 @@ def _load_specs_module(module_path: Path):
     spec = importlib.util.spec_from_file_location(module_name, module_path)
     if spec is None or spec.loader is None:
         raise ValueError(f"Unable to load module from: {module_path}")
-    _ensure_synthetic_package("prefector_external_blocks")
-    _ensure_synthetic_package(f"prefector_external_blocks.{namespace}")
+    _ensure_synthetic_package(EXTERNAL_BLOCKS_PACKAGE)
+    _ensure_synthetic_package(f"{EXTERNAL_BLOCKS_PACKAGE}.{namespace}")
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
     try:
         spec.loader.exec_module(module)
-    except (ModuleNotFoundError, ImportError) as exc:
+    except ImportError as exc:
         sys.modules.pop(module_name, None)
-        raise ValueError(_missing_dependency_message(module_path, exc)) from exc
+        raise ValueError(_import_error_message(module_path, exc)) from exc
     return module
 
 
@@ -158,22 +160,32 @@ def _ensure_synthetic_package(module_name: str) -> None:
     sys.modules[module_name] = module
 
 
-def _missing_dependency_message(module_path: Path, exc: ModuleNotFoundError | ImportError) -> str:
-    missing_name = getattr(exc, "name", None)
-    if not missing_name:
-        return f"Block spec '{module_path}' could not be imported: {exc}"
+def _is_local_module(module_path: Path, module_name: str) -> bool:
+    if not module_name:
+        return False
+    if module_name.startswith(f"{EXTERNAL_BLOCKS_PACKAGE}."):
+        return True
+    top_level = module_name.split(".", maxsplit=1)[0]
+    spec_dir = module_path.parent
+    return (spec_dir / f"{top_level}.py").exists() or (spec_dir / top_level).is_dir()
 
-    if missing_name.startswith("prefect_"):
-        package_name = missing_name.replace("_", "-")
-        return (
-            f"Block spec '{module_path}' requires missing Python module '{missing_name}'. "
-            f"Install the Prefect collection package: {package_name}"
+
+def _import_error_message(module_path: Path, exc: ImportError) -> str:
+    message = f"Block spec '{module_path}' could not be imported: {type(exc).__name__}: {exc}"
+
+    missing_name = exc.name if isinstance(exc, ModuleNotFoundError) else None
+    if missing_name and _is_local_module(module_path, missing_name):
+        message += (
+            "\nHint: block spec files cannot import other files from the blocks directory. "
+            "Move shared code into the spec file or into an installed package."
         )
+    elif missing_name and missing_name.startswith("prefect_"):
+        top_level = missing_name.split(".", maxsplit=1)[0]
+        message += f"\nHint: install the Prefect collection package: {top_level.replace('_', '-')}"
+    elif missing_name:
+        message += f"\nHint: install '{missing_name}' in the current environment and try again."
 
-    return (
-        f"Block spec '{module_path}' requires missing Python module '{missing_name}'. "
-        "Install it in the current environment and try again."
-    )
+    return f"{message}\nRun with --debug for the full stacktrace."
 
 
 def _validate_specs(specs: list[BlockSpec]) -> None:
