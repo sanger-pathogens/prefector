@@ -176,8 +176,9 @@ def _import_error_message(module_path: Path, exc: ImportError) -> str:
     missing_name = exc.name if isinstance(exc, ModuleNotFoundError) else None
     if missing_name and _is_local_module(module_path, missing_name):
         message += (
-            "\nHint: block spec files cannot import other files from the blocks directory. "
-            "Move shared code into the spec file or into an installed package."
+            "\nHint: the missing module is a file in the blocks directory, not a package to install. "
+            "Each block spec is loaded on its own, so it cannot import other files from the blocks directory. "
+            "Copy the shared code into this spec file, or move it into a package installed in this environment."
         )
     elif missing_name and missing_name.startswith("prefect_"):
         top_level = missing_name.split(".", maxsplit=1)[0]
