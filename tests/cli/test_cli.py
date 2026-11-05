@@ -35,6 +35,7 @@ def test_handle_errors_wraps_value_error():
     result = CliRunner().invoke(_raises_value_error, [], obj={})
     assert result.exit_code == 1
     assert "something went wrong" in result.output
+    assert "Run with --debug for the full stacktrace." in result.output
     assert "Traceback" not in result.output
 
 
@@ -42,11 +43,13 @@ def test_handle_errors_passes_through_click_exception():
     result = CliRunner().invoke(_raises_click_exception, [], obj={})
     assert result.exit_code == 1
     assert "already a click error" in result.output
+    assert "--debug" not in result.output
 
 
 def test_handle_errors_reraises_in_debug_mode():
-    with pytest.raises(ValueError, match="something went wrong"):
+    with pytest.raises(ValueError, match="something went wrong") as exc_info:
         CliRunner().invoke(_debug_cli, ["--debug", "cmd"], catch_exceptions=False)
+    assert "--debug" not in str(exc_info.value)
 
 
 def test_handle_errors_no_context_defaults_to_non_debug():
