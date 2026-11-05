@@ -148,6 +148,9 @@ def _load_specs_module(module_path: Path):
     except ImportError as exc:
         sys.modules.pop(module_name, None)
         raise ValueError(_import_error_message(module_path, exc)) from exc
+    except Exception as exc:
+        sys.modules.pop(module_name, None)
+        raise ValueError(f"Block spec '{module_path}' could not be loaded: {type(exc).__name__}: {exc}") from exc
     return module
 
 

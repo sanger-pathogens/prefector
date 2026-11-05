@@ -254,6 +254,19 @@ def test_load_blocks_reports_local_helper_import_without_install_hint(tmp_path, 
     assert "Hint: install" not in message
 
 
+def test_load_blocks_reports_non_import_error_with_spec_path(tmp_path):
+    spec_path = tmp_path / "dummy.py"
+    spec_path.write_text("undefined_name\nBLOCKS = []\n", encoding="utf-8")
+
+    with pytest.raises(ValueError) as exc_info:
+        load_blocks(tmp_path)
+
+    message = str(exc_info.value)
+    assert f"Block spec '{spec_path}' could not be loaded" in message
+    assert "NameError: name 'undefined_name' is not defined" in message
+    assert isinstance(exc_info.value.__cause__, NameError)
+
+
 def test_load_blocks_reports_import_error_without_module_name(tmp_path):
     (tmp_path / "dummy.py").write_text("raise ImportError('boom')\nBLOCKS = []\n", encoding="utf-8")
 
