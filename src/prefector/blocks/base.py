@@ -185,7 +185,7 @@ def _import_error_message(module_path: Path, exc: ImportError) -> str:
     elif missing_name:
         message += f"\nHint: install '{missing_name}' in the current environment and try again."
 
-    return f"{message}\nRun with --debug for the full stacktrace."
+    return message
 
 
 def _validate_specs(specs: list[BlockSpec]) -> None:

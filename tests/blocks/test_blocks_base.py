@@ -226,7 +226,6 @@ def test_load_blocks_reports_missing_generic_dependency(tmp_path):
     message = str(exc_info.value)
     assert "ModuleNotFoundError: No module named 'totally_nonexistent_module'" in message
     assert "install 'totally_nonexistent_module' in the current environment" in message
-    assert "--debug" in message
 
 
 def test_load_blocks_reports_unimportable_name_without_install_hint(tmp_path):
