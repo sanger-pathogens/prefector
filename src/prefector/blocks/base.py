@@ -184,8 +184,8 @@ def _import_error_message(module_path: Path, exc: ImportError) -> str:
             "Copy the shared code into this spec file, or move it into a package installed in this environment."
         )
     elif missing_name and missing_name.startswith("prefect_"):
-        top_level = missing_name.split(".", maxsplit=1)[0]
-        message += f"\nHint: install the Prefect collection package: {top_level.replace('_', '-')}"
+        top_level = missing_name.split(".", maxsplit=1)[0]  # e.g. prefect_aws.s3 becomes prefect-aws
+        message += f"\nHint: install the Prefect integration package: {top_level.replace('_', '-')}"
     elif missing_name:
         message += f"\nHint: install '{missing_name}' in the current environment and try again."
 

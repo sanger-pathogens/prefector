@@ -210,10 +210,14 @@ def test_load_blocks_rejects_non_blockspec_entries(tmp_path):
         load_blocks(tmp_path)
 
 
-def test_load_blocks_reports_missing_prefect_collection_dependency(tmp_path):
-    (tmp_path / "dummy.py").write_text("import prefect_nonexistent_collection\nBLOCKS = []\n", encoding="utf-8")
+def test_load_blocks_reports_missing_prefect_integration_package_dependency(tmp_path):
+    (tmp_path / "dummy.py").write_text(
+        "import prefect_nonexistent_integration_package\nBLOCKS = []\n", encoding="utf-8"
+    )
 
-    with pytest.raises(ValueError, match="install the Prefect collection package: prefect-nonexistent-collection"):
+    with pytest.raises(
+        ValueError, match="install the Prefect integration package: prefect-nonexistent-integration-package"
+    ):
         load_blocks(tmp_path)
 
 
