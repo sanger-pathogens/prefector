@@ -19,4 +19,4 @@ def handle_errors() -> Iterator[None]:
     except Exception as exc:
         if debug:
             raise
-        raise click.ClickException(str(exc)) from None
+        raise click.ClickException(f"{exc}\nRun with --debug for the full stacktrace.") from None

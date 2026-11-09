@@ -275,7 +275,7 @@ pre-commit install
 This will run pre-commit hooks on every commit. To run pre-commit manually, use
 
 ```bash
-pre commit run -a
+pre-commit run -a
 ```
 
 Run tests with:
